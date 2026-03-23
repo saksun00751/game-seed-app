@@ -6,7 +6,6 @@ datasource db {
   provider = "mysql"
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model employees {
   code                                                         Int                  @id @default(autoincrement()) @db.UnsignedInt
   department_code                                              Int                  @default(0)
@@ -143,7 +142,6 @@ model all_log {
   date_update     DateTime?      @db.Timestamp(0)
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model bank_payment {
   code               BigInt                   @id @default(autoincrement())
   bank               String                   @default("") @db.VarChar(20)
@@ -254,7 +252,6 @@ model banks {
   marketing_teams marketing_teams[]
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model banks_account {
   code             Int                          @id @default(autoincrement())
   date_start       DateTime                     @db.Date
@@ -359,7 +356,6 @@ model batch_user {
   date_update DateTime?             @db.Timestamp(0)
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model bills {
   code           Int            @id @default(autoincrement())
   ref_id         String         @default("") @db.VarChar(100)
@@ -401,7 +397,6 @@ model bills {
   @@index([pro_code], map: "pro_code")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model bills_free {
   code           Int               @id @default(autoincrement())
   ref_id         String            @default("") @db.VarChar(100)
@@ -477,7 +472,6 @@ model broadcast_sessions {
   created_at DateTime @default(now()) @db.Timestamp(0)
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model check_case {
   code              Int               @id @default(autoincrement()) @db.UnsignedInt
   bank_code         Int?              @db.UnsignedInt
@@ -1537,7 +1531,6 @@ model marketing_teams {
   @@index([bank_code], map: "marketing_teams_bank_code_foreign")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model member_deposit_stats {
   id                    BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   member_code           Int       @unique(map: "uk_member_deposit_stats_member_code") @db.UnsignedInt
@@ -2739,7 +2732,6 @@ model rewards {
   date_update   DateTime?      @db.Timestamp(0)
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model rewards_list {
   id                             BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
   code                           String               @unique(map: "rewards_list_code_unique") @db.VarChar(80)
