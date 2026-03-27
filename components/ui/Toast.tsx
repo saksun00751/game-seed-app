@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 interface Props {
   message: string;
   type?:   "error" | "success" | "warning";
+  durationMs?: number;
   onClose: () => void;
 }
 
-export default function Toast({ message, type = "error", onClose }: Props) {
+export default function Toast({ message, type = "error", durationMs = 3500, onClose }: Props) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -16,9 +17,9 @@ export default function Toast({ message, type = "error", onClose }: Props) {
     const t = setTimeout(() => {
       setVisible(false);
       setTimeout(onClose, 300);
-    }, 3500);
+    }, durationMs);
     return () => clearTimeout(t);
-  }, [onClose]);
+  }, [durationMs, onClose]);
 
   const styles = {
     error:   "bg-ap-red   text-white",

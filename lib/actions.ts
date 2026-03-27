@@ -1,30 +1,26 @@
 "use server";
 
-/**
- * lib/actions.ts
- * Next.js Server Actions — auth & betting, powered by Prisma + MariaDB (members table).
- */
+import { redirect } from "next/navigation";
 
-import bcrypt         from "bcryptjs";
-import { redirect }   from "next/navigation";
-import { headers }    from "next/headers";
+import { setApiTokenCookie, clearApiTokenCookie, setMemberCodeCookie, clearMemberCodeCookie } from "@/lib/session/cookies";
+import { getCurrentUser }                                          from "@/lib/session/auth";
+import { apiPost, ApiError }                                       from "@/lib/api/client";
 
-import { findUserByPhone, createUser, phoneExists, updateUserProfile, updatePasswordHash, findUserById, findUserByReferralCode } from "@/lib/db/users";
-import { createReferral } from "@/lib/db/referrals";
-import { createOtp, verifyOtp }                     from "@/lib/db/otp";
-import { createSession, destroySession }            from "@/lib/db/sessions";
-import { setSessionCookie, getSessionToken, clearSessionCookie } from "@/lib/session/cookies";
-import { sendOtpSms }                               from "@/lib/otp-sender";
+import type { LoginState, OtpState, RegisterState, PlaceBetState, WithdrawState } from "@/types/auth";
 
-import { getCurrentUser }                             from "@/lib/session/auth";
+import th from "@/lib/i18n/locales/th.json";
+import en from "@/lib/i18n/locales/en.json";
+import kh from "@/lib/i18n/locales/kh.json";
+import la from "@/lib/i18n/locales/la.json";
 
-import type {
-  LoginState, OtpState, RegisterState, PlaceBetState,
-} from "@/types/auth";
-import type { members } from "@prisma/client";
-import { prisma } from "./db/prisma";
+const locales = { th, en, kh, la } as const;
+type LangCode = keyof typeof locales;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getLang(formData: FormData): LangCode {
+  const lang = formData.get("lang") as string;
+  return (lang in locales ? lang : "th") as LangCode;
+}
+
 function normalizePhone(raw: string): string {
   return raw.replace(/[\s\-]/g, "");
 }
@@ -32,165 +28,148 @@ function isValidThaiPhone(phone: string): boolean {
   return /^0[6-9]\d{8}$/.test(phone);
 }
 
-async function getSessionMetadata() {
-  const head = await headers();
-  const userAgent = head.get("user-agent");
-  const ipAddress = head.get("x-forwarded-for")?.split(",")[0] ?? "127.0.0.1";
-  return { userAgent, ipAddress };
-}
-
-/**
- * Ensures a member has a referral code (members.refer).
- * If not, generates a unique one and assigns it.
- */
-async function assignReferralCodeOnLogin(member: members) {
-  if (member.refer) return;
-
-  let isUnique = false;
-  while (!isUnique) {
-    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const existing = await findUserByReferralCode(newCode);
-    if (!existing) {
-      isUnique = true;
-      await prisma.members.update({
-        where: { code: member.code },
-        data:  { refer: newCode },
-      });
-    }
-  }
-}
-
 // ─── OTP Login — Step 1: Request OTP ─────────────────────────────────────────
 export async function requestOtpAction(
-  prevState: LoginState,
+  _prevState: LoginState,
   formData: FormData
 ): Promise<LoginState> {
-  const phone = normalizePhone((formData.get("phone") as string) ?? "");
+  const t     = locales[getLang(formData)].login;
+  const phone = normalizePhone((formData.get("user_name") as string) ?? "");
 
-  if (!phone)                   return { error: "กรุณากรอกเบอร์โทรศัพท์" };
-  if (!isValidThaiPhone(phone)) return { error: "เบอร์โทรศัพท์ไม่ถูกต้อง (06–09, ครบ 10 หลัก)" };
-
-  const member = await findUserByPhone(phone);
-  if (!member) return { error: "ไม่พบบัญชีนี้ กรุณาสมัครสมาชิกก่อน" };
-
-  // const code = await createOtp(phone, "login");
-  // await sendOtpSms(phone, code);
+  if (!phone)                   return { error: t.errPhone };
+  if (!isValidThaiPhone(phone)) return { error: t.errPhoneInvalid };
 
   return { success: true, phone };
 }
 
 // ─── OTP Login — Step 2: Verify OTP ──────────────────────────────────────────
 export async function verifyOtpAction(
-  prevState: OtpState,
+  _prevState: OtpState,
   formData: FormData
 ): Promise<OtpState> {
-  const otp   = (formData.get("otp")   as string) ?? "";
-  const phone = (formData.get("phone") as string) ?? "";
+  const otp   = (formData.get("otp")       as string) ?? "";
+  const phone = (formData.get("user_name") as string) ?? "";
+  const lang  = getLang(formData);
 
   if (!/^\d{6}$/.test(otp)) return { error: "กรุณากรอก OTP 6 หลัก" };
 
-  // const valid = await verifyOtp(phone, otp, "login");
-  // if (!valid) return { error: "รหัส OTP ไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่" };
+  let apiToken: string | undefined;
+  try {
+    const res = await apiPost<{ access_token?: string; data?: { access_token?: string } }>(
+      "/auth/login/otp", { user_name: phone, otp }, undefined, lang
+    );
+    apiToken = res.access_token ?? res.data?.access_token;
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message ?? "OTP ไม่ถูกต้อง" };
+    return { error: "ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่" };
+  }
 
-  const member = await findUserByPhone(phone);
-  if (!member) return { error: "ไม่พบบัญชีในระบบ" };
-
-  await assignReferralCodeOnLogin(member);
-
-  const { userAgent, ipAddress } = await getSessionMetadata();
-  const token = await createSession(String(member.code), userAgent, ipAddress);
-  await setSessionCookie(token);
-
+  if (apiToken) await setApiTokenCookie(apiToken);
   return { success: true };
 }
 
 // ─── Login with Password ──────────────────────────────────────────────────────
 export interface LoginPasswordState {
   error?: string;
-  fieldErrors?: { phone?: string; password?: string };
+  fieldErrors?: { user_name?: string; password?: string };
   success?: boolean;
   phone?: string;
 }
 
 export async function loginWithPasswordAction(
-  prevState: LoginPasswordState,
+  _prevState: LoginPasswordState,
   formData: FormData
 ): Promise<LoginPasswordState> {
-  const phone    = normalizePhone((formData.get("phone")    as string) ?? "");
+  const lang     = getLang(formData);
+  const t        = locales[lang].login;
+  const phone    = normalizePhone((formData.get("user_name") as string) ?? "");
   const password = (formData.get("password") as string) ?? "";
 
   const fieldErrors: LoginPasswordState["fieldErrors"] = {};
-  if (!phone)                    fieldErrors.phone    = "กรุณากรอกเบอร์โทรศัพท์";
-  else if (!isValidThaiPhone(phone)) fieldErrors.phone = "เบอร์ไม่ถูกต้อง (06–09, ครบ 10 หลัก)";
-  if (!password)                 fieldErrors.password = "กรุณากรอกรหัสผ่าน";
+  if (!phone)                        fieldErrors.user_name = t.errPhone;
+  else if (!isValidThaiPhone(phone)) fieldErrors.user_name = t.errPhoneInvalid;
+  if (!password)                     fieldErrors.password  = t.errPassword;
   if (Object.keys(fieldErrors).length) return { fieldErrors };
 
-  const member = await findUserByPhone(phone);
+  interface LoginRes {
+    access_token?: string;
+    member?: { code?: number };
+  }
+  let apiToken: string | undefined;
+  let memberCode: number | undefined;
+  try {
+    const res = await apiPost<LoginRes>("/auth/login", { user_name: phone, password }, undefined, lang);
+    apiToken   = res.access_token;
+    memberCode = res.member?.code;
+  } catch (e) {
+    if (e instanceof ApiError) {
+      if (e.status === 401 || e.status === 400) return { error: t.errCredentials };
+      return { error: e.message ?? t.errCredentials };
+    }
+    return { error: "ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่" };
+  }
 
-  // Constant-time comparison even when member not found (prevent timing attacks)
-  const hashToCheck = member?.password ?? "$2b$10$invalidhashforcomparisononlyXXXXXXXXXXXX";
-  const match = await bcrypt.compare(password, hashToCheck);
-
-  if (!member || !match) return { error: "เบอร์โทรศัพท์หรือรหัสผ่านไม่ถูกต้อง" };
-  if (!member.password)  return { error: "บัญชีนี้ไม่มีรหัสผ่าน กรุณาใช้ OTP แทน" };
-
-  await assignReferralCodeOnLogin(member);
-
-  const { userAgent, ipAddress } = await getSessionMetadata();
-  const token = await createSession(String(member.code), userAgent, ipAddress);
-  await setSessionCookie(token);
-
-  return { success: true, phone };
+  if (!apiToken) return { error: t.errCredentials };
+  await setApiTokenCookie(apiToken);
+  if (memberCode) await setMemberCodeCookie(memberCode);
+  return { success: true };
 }
 
 // ─── Register ─────────────────────────────────────────────────────────────────
 export async function registerAction(
-  prevState: RegisterState,
+  _prevState: RegisterState,
   formData: FormData
 ): Promise<RegisterState> {
-  const phone           = normalizePhone((formData.get("phone")           as string) ?? "");
+  const lang            = getLang(formData);
+  const t               = locales[lang].register;
+  const phone           = normalizePhone((formData.get("user_name")   as string) ?? "");
   const password        = (formData.get("password")        as string) ?? "";
   const confirmPassword = (formData.get("confirmPassword") as string) ?? "";
-  const refCode         = ((formData.get("referralCode")   as string) ?? "").trim().toUpperCase();
+  const firstname       = ((formData.get("firstname")      as string) ?? "").trim();
+  const lastname        = ((formData.get("lastname")       as string) ?? "").trim();
+  const accNo           = ((formData.get("acc_no")         as string) ?? "").replace(/\D/g, "");
+  const bankRaw         = (formData.get("bank")            as string) ?? "";
+  const bank            = parseInt(bankRaw, 10);
+  const referRaw        = ((formData.get("referralCode")   as string) ?? "").trim();
 
   const fieldErrors: RegisterState["fieldErrors"] = {};
-
-  if (!phone)                        fieldErrors.phone = "กรุณากรอกเบอร์โทรศัพท์";
-  else if (!isValidThaiPhone(phone)) fieldErrors.phone = "เบอร์ไม่ถูกต้อง (06–09, ครบ 10 หลัก)";
-
-  if (!password)                fieldErrors.password = "กรุณากรอกรหัสผ่าน";
-  else if (password.length < 8) fieldErrors.password = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
-  else if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password))
-                                fieldErrors.password = "ต้องมีทั้งตัวอักษรและตัวเลข";
-
-  if (!confirmPassword)                        fieldErrors.confirmPassword = "กรุณายืนยันรหัสผ่าน";
-  else if (confirmPassword !== password)       fieldErrors.confirmPassword = "รหัสผ่านไม่ตรงกัน";
-
+  if (!phone)                        fieldErrors.user_name = t.errPhone;
+  else if (!isValidThaiPhone(phone)) fieldErrors.user_name = t.errPhoneInvalid;
+  if (!password)                                              fieldErrors.password = t.errPassword;
+  else if (password.length < 6 || password.length > 10)      fieldErrors.password = t.errPasswordLen;
+  if (!confirmPassword)                  fieldErrors.confirmPassword = t.errConfirmPassword;
+  else if (confirmPassword !== password) fieldErrors.confirmPassword = t.confirmMismatch;
+  if (!firstname)                      fieldErrors.firstname = t.errFirstname;
+  if (!lastname)                       fieldErrors.lastname  = t.errLastname;
+  if (!bankRaw || isNaN(bank))         fieldErrors.bank      = t.errBank;
+  if (!accNo)                          fieldErrors.acc_no    = t.errAccNo;
+  else if (accNo.length < 10 || accNo.length > 12) fieldErrors.acc_no = t.errAccNoLen;
   if (Object.keys(fieldErrors).length) return { fieldErrors };
 
-  if (await phoneExists(phone)) return { fieldErrors: { phone: "เบอร์นี้ถูกใช้งานแล้ว" } };
-
-  // Resolve referrer
-  let referrer: members | null = null;
-  if (refCode) {
-    referrer = await findUserByReferralCode(refCode);
+  // ── Register ───────────────────────────────────────────────────────────────
+  try {
+    await apiPost("/auth/register", {
+      user_name: phone, password, password_confirm: confirmPassword,
+      firstname, lastname, acc_no: accNo, bank: String(bank), refer: referRaw,
+    }, undefined, lang);
+  } catch (e) {
+    if (e instanceof ApiError) {
+      if (e.status === 409 || e.message?.toLowerCase().includes("exist"))
+        return { fieldErrors: { user_name: t.errPhoneExists } };
+      return { error: e.message ?? "สมัครสมาชิกไม่สำเร็จ กรุณาลองใหม่" };
+    }
+    return { error: "ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่" };
   }
 
-  const hash    = await bcrypt.hash(password, 12);
-  const newMember = await createUser(phone, hash, undefined, referrer ? refCode : undefined);
+  // ── Auto-login after register ──────────────────────────────────────────────
+  try {
+    interface LoginRes { access_token?: string; member?: { code?: number } }
+    const res = await apiPost<LoginRes>("/auth/login", { user_name: phone, password }, undefined, lang);
+    if (res.access_token)  await setApiTokenCookie(res.access_token);
+    if (res.member?.code)  await setMemberCodeCookie(res.member.code);
+  } catch {}
 
-  // Link referral record (sets refer_code on newMember)
-  if (referrer) {
-    await createReferral(String(referrer.code), String(newMember.code));
-  }
-
-  await assignReferralCodeOnLogin(newMember);
-
-  const { userAgent, ipAddress } = await getSessionMetadata();
-  const token = await createSession(String(newMember.code), userAgent, ipAddress);
-  await setSessionCookie(token);
-
-  return { success: true, phone };
+  redirect(`/${lang}/dashboard`);
 }
 
 // ─── Update Profile ───────────────────────────────────────────────────────────
@@ -201,30 +180,26 @@ export interface UpdateProfileState {
 }
 
 export async function updateProfileAction(
-  prevState: UpdateProfileState,
+  _prevState: UpdateProfileState,
   formData: FormData
 ): Promise<UpdateProfileState> {
   const user = await getCurrentUser();
   if (!user) return { error: "กรุณาเข้าสู่ระบบก่อน" };
 
-  const firstname    = (formData.get("firstname")     as string ?? "").trim();
-  const lastname     = (formData.get("lastname")      as string ?? "").trim();
-  const displayName  = [firstname, lastname].filter(Boolean).join(" ");
-  const bankCodeRaw  = (formData.get("bankCode")      as string ?? "").trim();
-  const bankAccount  = (formData.get("bankAccount")   as string ?? "").trim().replace(/\D/g, "");
-
-  const bankCode = parseInt(bankCodeRaw, 10);
+  const firstname   = (formData.get("firstname")   as string ?? "").trim();
+  const lastname    = (formData.get("lastname")     as string ?? "").trim();
+  const bankCodeRaw = (formData.get("bankCode")     as string ?? "").trim();
+  const bankAccount = (formData.get("bankAccount")  as string ?? "").trim().replace(/\D/g, "");
+  const bankCode    = parseInt(bankCodeRaw, 10);
 
   const fieldErrors: UpdateProfileState["fieldErrors"] = {};
-  if (!firstname)                            fieldErrors.displayName = "กรุณากรอกชื่อ";
-  if (!bankCodeRaw || isNaN(bankCode))       fieldErrors.bankCode    = "กรุณาเลือกธนาคาร";
-  if (!bankAccount)                          fieldErrors.bankAccount = "กรุณากรอกเลขบัญชี";
+  if (!firstname)                   fieldErrors.displayName = "กรุณากรอกชื่อ";
+  if (!bankCodeRaw || isNaN(bankCode)) fieldErrors.bankCode = "กรุณาเลือกธนาคาร";
+  if (!bankAccount)                 fieldErrors.bankAccount = "กรุณากรอกเลขบัญชี";
   else if (bankAccount.length < 10 || bankAccount.length > 12)
-                                             fieldErrors.bankAccount = "เลขบัญชีต้องมี 10–12 หลัก";
+                                    fieldErrors.bankAccount = "เลขบัญชีต้องมี 10–12 หลัก";
   if (Object.keys(fieldErrors).length) return { fieldErrors };
-
-  await updateUserProfile(user.id, { firstname, lastname, bankCode, bankAccount });
-  return { success: true };
+  return { error: "ระบบแก้ไขโปรไฟล์กำลังย้ายไป API" };
 }
 
 // ─── Change Password ───────────────────────────────────────────────────────────
@@ -235,7 +210,7 @@ export interface ChangePasswordState {
 }
 
 export async function changePasswordAction(
-  prevState: ChangePasswordState,
+  _prevState: ChangePasswordState,
   formData: FormData
 ): Promise<ChangePasswordState> {
   const user = await getCurrentUser();
@@ -251,46 +226,24 @@ export async function changePasswordAction(
   else if (newPassword.length < 8) fieldErrors.newPassword = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
   else if (!/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword))
     fieldErrors.newPassword = "ต้องมีทั้งตัวอักษรและตัวเลข";
-  if (!confirmPassword) fieldErrors.confirmPassword = "กรุณายืนยันรหัสผ่านใหม่";
+  if (!confirmPassword)                  fieldErrors.confirmPassword = "กรุณายืนยันรหัสผ่านใหม่";
   else if (confirmPassword !== newPassword) fieldErrors.confirmPassword = "รหัสผ่านไม่ตรงกัน";
   if (Object.keys(fieldErrors).length) return { fieldErrors };
-
-  const fullMember = await findUserById(user.id);
-  if (!fullMember?.password) return { error: "บัญชีนี้ไม่มีรหัสผ่าน กรุณาใช้ OTP แทน" };
-
-  const match = await bcrypt.compare(oldPassword, fullMember.password);
-  if (!match) return { fieldErrors: { oldPassword: "รหัสผ่านเดิมไม่ถูกต้อง" } };
-
-  if (oldPassword === newPassword) return { fieldErrors: { newPassword: "รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสเดิม" } };
-
-  const hash = await bcrypt.hash(newPassword, 12);
-  await updatePasswordHash(user.id, hash);
-  return { success: true };
+  return { error: "ระบบเปลี่ยนรหัสผ่านกำลังย้ายไป API" };
 }
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
 export async function logoutAction(): Promise<void> {
-  const token = await getSessionToken();
-  if (token) {
-    await destroySession(token);
-    await clearSessionCookie();
-  }
+  const apiToken = await (await import("@/lib/session/cookies")).getApiToken();
+  try { await apiPost("/auth/logout", {}, apiToken ?? undefined); } catch {}
+  await clearApiTokenCookie();
+  await clearMemberCodeCookie();
   redirect("/login");
 }
 
 // ─── Place Bet ────────────────────────────────────────────────────────────────
-
-const BET_TYPE_MAP: Record<string, "top3" | "tod3" | "top2" | "bot2" | "run_top" | "run_bot"> = {
-  "3top":    "top3",
-  "3tod":    "tod3",
-  "2top":    "top2",
-  "2bot":    "bot2",
-  "run_top": "run_top",
-  "run_bot": "run_bot",
-};
-
 export async function placeBetAction(
-  prevState: PlaceBetState,
+  _prevState: PlaceBetState,
   formData: FormData
 ): Promise<PlaceBetState> {
   const betsJson  = formData.get("bets")      as string;
@@ -315,32 +268,66 @@ export async function placeBetAction(
 
 // ─── Spin Wheel ──────────────────────────────────────────────────────────────
 export async function spinWheelAction(): Promise<{
-  error?: string;
-  prize?: number;
+  error?:   string;
+  code?:    number;
+  prize?:   number;
   diamond?: number;
+  title?:   string;
+  msg?:     string;
+  img?:     string;
 }> {
-  const user = await getCurrentUser();
-  if (!user) return { error: "กรุณาเข้าสู่ระบบ" };
-  if (user.diamond < 1) return { error: "Diamond ไม่เพียงพอ" };
+  try {
+    const { getApiToken, getLangCookie } = await import("@/lib/session/cookies");
+    const [apiToken, lang] = await Promise.all([getApiToken(), getLangCookie()]);
 
-  const PRIZES = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
-  const prize  = PRIZES[Math.floor(Math.random() * PRIZES.length)];
-  const memberCode = parseInt(user.id, 10);
+    const res = await apiPost<{
+      success:  boolean;
+      code?:    number;
+      diamond?: number;
+      message?: string;
+      format?: {
+        title?:   string;
+        msg?:     string;
+        img?:     string;
+        point?:   number;
+        diamond?: number;
+      };
+    }>("/wheel/spin", {}, apiToken ?? undefined, lang);
 
-  const updated = await prisma.members.update({
-    where: { code: memberCode },
-    data: {
-      diamond: { decrement: 1 },
-      balance: { increment: prize },
-    },
-    select: { diamond: true },
-  });
+    const fmt    = res.format ?? {};
+    const code   = res.code;
+    const prize  = fmt.point;
+    const diamond = fmt.diamond ?? res.diamond;
 
-  return { prize, diamond: parseFloat(String(updated.diamond)) };
+    return { code, prize, diamond, title: fmt.title, msg: fmt.msg, img: fmt.img };
+  } catch (err: any) {
+    return { error: err?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่" };
+  }
 }
 
-// ─── Security & Login History ────────────────────────────────────────────────
+// ─── Withdraw ─────────────────────────────────────────────────────────────────
+export async function withdrawAction(
+  _prevState: WithdrawState,
+  formData: FormData,
+): Promise<WithdrawState> {
+  const amountRaw = (formData.get("amount") as string) ?? "";
+  const amount    = parseFloat(amountRaw);
+
+  if (!amountRaw || isNaN(amount) || amount <= 0) return { error: "จำนวนเงินไม่ถูกต้อง" };
+
+  try {
+    const { getApiToken, getLangCookie } = await import("@/lib/session/cookies");
+    const [apiToken, lang] = await Promise.all([getApiToken(), getLangCookie()]);
+    if (!apiToken) return { error: "กรุณาเข้าสู่ระบบ" };
+
+    await apiPost("/wallet/withdraw", { amount: String(amount) }, apiToken, lang);
+    return { success: true, amount };
+  } catch (err) {
+    return { error: err instanceof ApiError ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่" };
+  }
+}
+
+// ─── Security & Login History ─────────────────────────────────────────────────
 export async function getLoginHistoryAction() {
-  // sessions are stored in members.session_id (single session) — no history table
   return [];
 }

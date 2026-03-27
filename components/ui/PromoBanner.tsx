@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useLang } from "@/lib/i18n/context";
 
 interface PromoItem {
   code:    number;
@@ -8,10 +9,23 @@ interface PromoItem {
   filepic: string;
 }
 
-export default function PromoBanner({ promos }: { promos: PromoItem[] }) {
-  const items = promos.filter((p) => p.filepic);
-  const [idx, setIdx]   = useState(0);
-  const timerRef        = useRef<ReturnType<typeof setInterval> | null>(null);
+export default function PromoBanner() {
+  const { lang } = useLang();
+  const [items, setItems]   = useState<PromoItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [idx, setIdx]       = useState(0);
+  const timerRef            = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/promotion/list")
+      .then((r) => r.json())
+      .then((res) => {
+        const list: PromoItem[] = (res.data?.promotions ?? []).filter((p: PromoItem) => p.filepic);
+        setItems(list);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   const go = (i: number) => setIdx((i + items.length) % items.length);
 
@@ -26,6 +40,10 @@ export default function PromoBanner({ promos }: { promos: PromoItem[] }) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [items.length]);
 
+  if (loading) return (
+    <div className="w-full aspect-[16/6] rounded-2xl bg-gray-200 animate-pulse" />
+  );
+
   if (items.length === 0) return null;
 
   return (
@@ -38,11 +56,11 @@ export default function PromoBanner({ promos }: { promos: PromoItem[] }) {
         {items.map((p) => (
           <Link
             key={p.code}
-            href="/promotion"
+            href={`/${lang}/promotion`}
             className="relative flex-shrink-0 w-full aspect-[16/6] bg-ap-bg block"
           >
             <img
-              src={`https://service.1168lot.com/storage/promotion_img/${p.filepic}`}
+              src={p.filepic}
               alt={p.name_th}
               className="w-full h-full object-cover"
             />

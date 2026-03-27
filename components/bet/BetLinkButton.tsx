@@ -7,9 +7,18 @@ import Toast from "@/components/ui/Toast";
 interface Props {
   href:     string;
   closeAt?: string;   // ISO 8601 string
+  labelPlay?: string;
+  labelClosed?: string;
+  toastClosedRefresh?: string;
 }
 
-export default function BetLinkButton({ href, closeAt }: Props) {
+export default function BetLinkButton({
+  href,
+  closeAt,
+  labelPlay = "แทงหวย →",
+  labelClosed = "ปิดรับ",
+  toastClosedRefresh = "หวยปิดรับแล้ว กำลังรีเฟรชข้อมูล...",
+}: Props) {
   const router = useRouter();
   const [toast,   setToast]   = useState(false);
   const [expired, setExpired] = useState(false);
@@ -29,7 +38,7 @@ export default function BetLinkButton({ href, closeAt }: Props) {
   if (expired) {
     return (
       <div className="block w-full text-center bg-ap-red/10 border border-ap-red/20 text-ap-red rounded-full py-2 text-[12px] font-semibold">
-        ปิดรับ
+        {labelClosed}
       </div>
     );
   }
@@ -49,12 +58,12 @@ export default function BetLinkButton({ href, closeAt }: Props) {
         onClick={handleClick}
         className="block w-full text-center bg-ap-blue text-white rounded-full py-2 text-[12px] font-semibold hover:bg-ap-blue-h transition-colors active:scale-95"
       >
-        แทงหวย →
+        {labelPlay}
       </button>
 
       {toast && (
         <Toast
-          message="หวยปิดรับแล้ว กำลังรีเฟรชข้อมูล..."
+          message={toastClosedRefresh}
           type="warning"
           onClose={() => setToast(false)}
         />

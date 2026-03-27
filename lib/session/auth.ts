@@ -1,78 +1,69 @@
-/**
- * lib/session/auth.ts
- *
- * Server-side helper: resolves the current logged-in user from
- * the session cookie, mapped to the `members` table.
- */
-
-import { getSessionToken } from "./cookies";
-import { getSession, refreshSession } from "@/lib/db/sessions";
-import { findUserById }    from "@/lib/db/users";
+import { cache } from "react";
+import { getApiToken, getLangCookie, getMemberCodeCookie } from "./cookies";
+import { apiGet } from "@/lib/api/client";
 
 export interface AuthUser {
-  id:           string;        // String(members.code)
-  phone:        string;        // members.tel
-  displayName:  string;        // members.name
-  firstname:    string;        // members.firstname
-  lastname:     string;        // members.lastname
-  balance:      number;        // members.balance
-  level:        number;        // members.payment_level
-  diamond:      number;        // members.diamond
-  createdAt:    Date | null;   // members.date_create
-  bankName:     string | null; // banks.name_th via members.bank_code
-  bankAccount:  string | null; // members.acc_no
-  referralCode: string | null; // members.refer
+  id:          string;        // user_name (phone)
+  phone:       string;
+  displayName: string;
+  firstname:   string;
+  lastname:    string;
+  balance:     number;
+  diamond:     number;
+  credit:      number;
+  level:       number;
+  bankCode:    number | null;
+  bankAccount: string | null; // non-null = bank already set
+  referralCode: string | null;
+  createdAt:   Date | null;
 }
 
-/**
- * Returns the authenticated user or null.
- * Call this from any Server Component / Server Action.
- */
-export async function getCurrentUser(): Promise<AuthUser | null> {
+interface ProfileResponse {
+  success: boolean;
+  profile: {
+    user_name:  string;
+    name:       string;
+    balance:    string;
+    diamond:    number;
+    credit:     string;
+    bank_code:  number;
+  };
+}
+
+export const getCurrentUser = cache(async function (): Promise<AuthUser | null> {
   try {
-    const token = await getSessionToken();
-    if (!token) return null;
+    const apiToken = await getApiToken();
+    if (!apiToken) return null;
 
-    const session = await getSession(token);
-    if (!session) return null;
+    const lang = await getLangCookie();
+    const res  = await apiGet<ProfileResponse>("/member/profile", apiToken, lang);
+    if (!res?.success || !res.profile) return null;
 
-    // Extend expiry on every request (rolling session)
-    await refreshSession(token);
-
-    const m = await findUserById(session.userId);
-    if (!m) return null;
-
-    let bankName: string | null = null;
-    if (m.bank_code) {
-      const { prisma } = await import("@/lib/db/prisma");
-      const bank = await prisma.banks.findFirst({
-        where:  { code: m.bank_code },
-        select: { name_th: true },
-      });
-      bankName = bank?.name_th ?? null;
-    }
+    const p          = res.profile;
+    const memberCode = await getMemberCodeCookie();
+    const nameParts  = (p.name || "").trim().split(/\s+/);
 
     return {
-      id:           String(m.code),
-      phone:        m.tel,
-      displayName:  m.name || m.tel,
-      firstname:    m.firstname,
-      lastname:     m.lastname,
-      balance:      parseFloat(String(m.balance)),
-      level:        m.payment_level,
-      diamond:      parseFloat(String(m.diamond)),
-      createdAt:    m.date_create ?? null,
-      bankName,
-      bankAccount:  m.acc_no || null,
-      referralCode: m.refer || null,
+      id:          memberCode ?? p.user_name,
+      phone:       p.user_name,
+      displayName: p.name || p.user_name,
+      firstname:   nameParts[0]              || "",
+      lastname:    nameParts.slice(1).join(" ") || "",
+      balance:     parseFloat(p.balance)     || 0,
+      diamond:     Number(p.diamond)         || 0,
+      credit:      parseFloat(p.credit)      || 0,
+      level:       0,
+      bankCode:    p.bank_code > 0 ? p.bank_code : null,
+      bankAccount: p.bank_code > 0 ? String(p.bank_code) : null,
+      referralCode: null,
+      createdAt:   null,
     };
-  } catch (error) {
-    console.error("Authentication check failed:", error);
+  } catch (e) {
+    console.error("[getCurrentUser] error:", e);
     return null;
   }
-}
+});
 
-/** Redirect-aware guard — throws NEXT_REDIRECT if unauthenticated */
 export async function requireAuth(): Promise<AuthUser> {
   const user = await getCurrentUser();
   if (!user) {

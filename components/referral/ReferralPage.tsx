@@ -102,7 +102,7 @@ export default function ReferralPage({
   referrals = [],
 }: Props) {
   return (
-    <div className="max-w-2xl mx-auto px-5 pt-6 pb-24 sm:pb-8 space-y-5">
+    <div className="max-w-5xl mx-auto px-5 pt-6 pb-24 sm:pb-8 space-y-5">
 
       {/* Hero banner */}
       <div className="bg-gradient-to-br from-orange-500 to-amber-400 rounded-3xl p-6 text-white relative overflow-hidden">

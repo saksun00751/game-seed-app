@@ -13,6 +13,8 @@ import { useFormStatus } from "react-dom";
 import { requestOtpAction, verifyOtpAction, loginWithPasswordAction } from "@/lib/actions";
 import type { LoginStep } from "@/types/auth";
 import Input from "@/components/ui/Input";
+import { useTranslation } from "@/lib/i18n/useTranslation";
+import { useLang } from "@/lib/i18n/context";
 
 function SubmitButton({ children, disabled }: { children: React.ReactNode; disabled?: boolean }) {
   const { pending } = useFormStatus();
@@ -28,7 +30,7 @@ function SubmitButton({ children, disabled }: { children: React.ReactNode; disab
             <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
             <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
-          กรุณารอสักครู่…
+          {children}
         </>
       ) : children}
     </button>
@@ -107,14 +109,14 @@ function useCountdown(seconds: number) {
   const [active, setActive] = useState(true);
   useEffect(() => {
     if (!active || remaining <= 0) { setActive(false); return; }
-    const t = setTimeout(() => setRemaining((r) => r - 1), 1000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setRemaining((r) => r - 1), 1000);
+    return () => clearTimeout(timer);
   }, [remaining, active]);
   const reset = useCallback(() => { setRemaining(seconds); setActive(true); }, [seconds]);
   return { remaining, expired: !active, reset };
 }
 
-function formatPhone(raw: string) {
+export function formatPhone(raw: string) {
   const d = raw.replace(/\D/g, "").slice(0, 10);
   if (d.length <= 3) return d;
   if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
@@ -124,6 +126,11 @@ function formatPhone(raw: string) {
 function maskPhone(phone: string) {
   const d = phone.replace(/\D/g, "");
   return `${d.slice(0, 3)}-${d.slice(3, 5)}X-XXXX`;
+}
+
+export function isValidPhoneFormat(phone: string): boolean {
+  const digits = phone.replace(/\D/g, "");
+  return /^0[6-9]\d{8}$/.test(digits);
 }
 
 function ErrorBanner({ msg }: { msg: string }) {
@@ -137,9 +144,12 @@ function ErrorBanner({ msg }: { msg: string }) {
   );
 }
 
-type LoginMode = "password" | "otp" ;
+type LoginMode = "password" | "otp";
 
 export default function LoginForm() {
+  const t = useTranslation("login");
+  const { lang } = useLang();
+
   const [mode, setMode] = useState<LoginMode>("password");
   const [step, setStep] = useState<LoginStep>("input");
   const [phoneDisplay, setPhoneDisplay] = useState("");
@@ -180,13 +190,10 @@ export default function LoginForm() {
     if (pwState.error || pwState.fieldErrors) shake();
   }, [pwState]);
 
-  // ตรวจสอบ Query Param ว่าเซสชันหมดอายุหรือไม่
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("expired") === "1") {
-      setPhoneError("เซสชันหมดอายุหรือมีการเข้าสู่ระบบจากที่อื่น กรุณาเข้าสู่ระบบใหม่");
-    }
-  }, []);
+    if (params.get("expired") === "1") setPhoneError(t.errSession);
+  }, [t.errSession]);
 
   useEffect(() => {
     if (step === "success" && typeof window !== "undefined") {
@@ -198,8 +205,8 @@ export default function LoginForm() {
 
   function validatePhone(): boolean {
     const digits = phoneDisplay.replace(/\D/g, "");
-    if (!digits) { setPhoneError("กรุณากรอกเบอร์โทรศัพท์"); return false; }
-    if (!/^0[6-9]\d{8}$/.test(digits)) { setPhoneError("เบอร์ไม่ถูกต้อง (06–09, ครบ 10 หลัก)"); return false; }
+    if (!digits) { setPhoneError(t.errPhone); return false; }
+    if (!isValidPhoneFormat(digits)) { setPhoneError(t.errPhoneInvalid); return false; }
     return true;
   }
 
@@ -223,9 +230,9 @@ export default function LoginForm() {
             <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <h2 className="text-[22px] font-bold text-ap-primary">เข้าสู่ระบบสำเร็จ!</h2>
+        <h2 className="text-[22px] font-bold text-ap-primary">{t.successTitle}</h2>
         <p className="text-[14px] text-ap-secondary mt-1.5">
-          ยินดีต้อนรับกลับมา{" "}
+          {t.successBack}{" "}
           <span className="font-semibold text-ap-primary">
             {maskPhone(mode === "otp" ? otpPhone : phoneDisplay)}
           </span>
@@ -235,9 +242,9 @@ export default function LoginForm() {
             <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
             <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
-          กำลังพาไปยังหน้าหลัก…
+          {t.successRedirect}
         </div>
-        <a href="/dashboard" className="mt-2 block text-[13px] text-ap-blue font-medium hover:opacity-70">ไปเลย →</a>
+        <a href={`/${lang}/dashboard`} className="mt-2 block text-[13px] text-ap-blue font-medium hover:opacity-70">{t.goNow}</a>
       </div>
     );
   }
@@ -249,7 +256,7 @@ export default function LoginForm() {
       <div ref={cardRef} className="animate-fade-up">
         <button onClick={() => setStep("input")} className="flex items-center gap-1.5 text-[13px] text-ap-blue font-medium mb-6 hover:opacity-70">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
-          กลับ
+          {t.back}
         </button>
         <div className="mb-6">
           <div className="w-12 h-12 rounded-2xl bg-ap-blue/10 flex items-center justify-center mb-4">
@@ -257,9 +264,9 @@ export default function LoginForm() {
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </div>
-          <h2 className="text-[20px] font-bold text-ap-primary">ยืนยัน OTP</h2>
+          <h2 className="text-[20px] font-bold text-ap-primary">{t.otpTitle}</h2>
           <p className="text-[14px] text-ap-secondary mt-1">
-            ส่งรหัส 6 หลักไปยัง <span className="font-semibold text-ap-primary">{maskPhone(otpPhone)}</span>
+            {t.otpDesc} <span className="font-semibold text-ap-primary">{maskPhone(otpPhone)}</span>
           </p>
           <p className="text-[12px] text-ap-tertiary mt-0.5">
             (Demo: <span className="font-mono font-bold text-ap-primary">123456</span>)
@@ -270,12 +277,13 @@ export default function LoginForm() {
         <div className="text-center mt-4 mb-6">
           {expired ? (
             <form action={reqAction}>
-              <input type="hidden" name="phone" value={otpPhone} />
-              <button type="submit" className="text-[13px] text-ap-blue font-semibold hover:opacity-70">ส่ง OTP อีกครั้ง</button>
+              <input type="hidden" name="user_name" value={otpPhone} />
+              <input type="hidden" name="lang" value={lang} />
+              <button type="submit" className="text-[13px] text-ap-blue font-semibold hover:opacity-70">{t.otpResend}</button>
             </form>
           ) : (
             <p className="text-[13px] text-ap-tertiary">
-              ส่งรหัสใหม่ได้ใน{" "}
+              {t.otpCountdown}{" "}
               <span className="font-semibold text-ap-primary tabular-nums">
                 {String(Math.floor(remaining / 60)).padStart(2, "0")}:{String(remaining % 60).padStart(2, "0")}
               </span>
@@ -284,8 +292,9 @@ export default function LoginForm() {
         </div>
         <form action={verifyAction}>
           <input type="hidden" name="otp" value={otpFull} />
-          <input type="hidden" name="phone" value={otpPhone} />
-          <SubmitButton disabled={otpFull.length < 6}>ยืนยัน OTP</SubmitButton>
+          <input type="hidden" name="user_name" value={otpPhone} />
+          <input type="hidden" name="lang" value={lang} />
+          <SubmitButton disabled={otpFull.length < 6}>{t.otpSubmit}</SubmitButton>
         </form>
       </div>
     );
@@ -297,7 +306,7 @@ export default function LoginForm() {
 
       {/* Tab switcher */}
       <div className="flex bg-ap-bg rounded-2xl p-1 mb-7 gap-1">
-        {([ "password","otp"] as LoginMode[]).map((m) => (
+        {(["password", "otp"] as LoginMode[]).map((m) => (
           <button
             key={m}
             type="button"
@@ -308,8 +317,8 @@ export default function LoginForm() {
             ].join(" ")}
           >
             <span>{m === "otp" ? "💬" : "🔑"}</span>
-            <span className="hidden sm:inline">{m === "otp" ? "เบอร์โทร + OTP" : "เบอร์โทร + รหัสผ่าน"}</span>
-            <span className="sm:hidden">{m === "otp" ? "OTP" : "รหัสผ่าน"}</span>
+            <span className="hidden sm:inline">{m === "otp" ? t.tabOtp : t.tabPassword}</span>
+            <span className="sm:hidden">{m === "otp" ? t.tabPassword : t.tabPassword}</span>
           </button>
         ))}
       </div>
@@ -318,18 +327,19 @@ export default function LoginForm() {
       {mode === "otp" && (
         <form action={reqAction} className="flex flex-col gap-4"
           onSubmit={(e) => { if (!validatePhone()) e.preventDefault(); }}>
+          <input type="hidden" name="lang" value={lang} />
           <Input
-            label="เบอร์โทรศัพท์"
-            name="phone" type="tel" inputMode="tel"
+            label={t.phone}
+            name="user_name" type="tel" inputMode="tel"
             placeholder="0XX-XXX-XXXX" autoComplete="tel"
             value={phoneDisplay}
             onChange={(e) => { setPhoneDisplay(formatPhone(e.target.value.replace(/\D/g, "").slice(0, 10))); setPhoneError(""); }}
             onBlur={validatePhone}
             error={phoneError || reqState.error}
             leftEl={<PhoneIcon />} rightEl={phoneGreenCheck}
-            hint={!phoneError && !reqState.error ? "ระบบจะส่ง OTP ไปยังเบอร์นี้" : undefined}
+            hint={!phoneError && !reqState.error ? t.phoneHint : undefined}
           />
-          <SubmitButton>ขอรับรหัส OTP →</SubmitButton>
+          <SubmitButton>{t.submitOtp}</SubmitButton>
         </form>
       )}
 
@@ -337,20 +347,21 @@ export default function LoginForm() {
       {mode === "password" && (
         <form action={pwAction} className="flex flex-col gap-4"
           onSubmit={(e) => { if (!validatePhone()) e.preventDefault(); }}>
+          <input type="hidden" name="lang" value={lang} />
           <Input
-            label="เบอร์โทรศัพท์"
-            name="phone" type="tel" inputMode="tel"
+            label={t.phone}
+            name="user_name" type="tel" inputMode="tel"
             placeholder="0XX-XXX-XXXX" autoComplete="tel"
             value={phoneDisplay}
             onChange={(e) => { setPhoneDisplay(formatPhone(e.target.value.replace(/\D/g, "").slice(0, 10))); setPhoneError(""); }}
             onBlur={validatePhone}
-            error={phoneError || pwState.fieldErrors?.phone}
+            error={phoneError || pwState.fieldErrors?.user_name}
             leftEl={<PhoneIcon />} rightEl={phoneGreenCheck}
           />
           <Input
-            label="รหัสผ่าน"
+            label={t.password}
             name="password" type={showPw ? "text" : "password"}
-            placeholder="รหัสผ่านของคุณ" autoComplete="current-password"
+            placeholder="••••••••" autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             error={pwState.fieldErrors?.password}
@@ -361,7 +372,6 @@ export default function LoginForm() {
                 <EyeIcon open={showPw} />
               </button>
             }
-            hint={!pwState.fieldErrors?.password ? "Demo: demo1234" : undefined}
           />
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 cursor-pointer group">
@@ -370,18 +380,18 @@ export default function LoginForm() {
                   remember ? "bg-ap-blue border-ap-blue" : "bg-white border-ap-border group-hover:border-ap-blue/40"].join(" ")}>
                 {remember && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
               </button>
-              <span className="text-[13px] text-ap-secondary select-none">จดจำฉัน</span>
+              <span className="text-[13px] text-ap-secondary select-none">{t.remember}</span>
             </label>
-            <button type="button" className="text-[13px] text-ap-blue font-medium hover:opacity-70">ลืมรหัสผ่าน?</button>
+            <button type="button" className="text-[13px] text-ap-blue font-medium hover:opacity-70">{t.forgot}</button>
           </div>
           {pwState.error && <ErrorBanner msg={pwState.error} />}
-          <SubmitButton>เข้าสู่ระบบ</SubmitButton>
+          <SubmitButton>{t.submitLogin}</SubmitButton>
         </form>
       )}
 
       <p className="text-center text-[13px] text-ap-secondary mt-6">
-        ยังไม่มีบัญชี?{" "}
-        <a href="/register" className="text-ap-blue font-semibold hover:opacity-70">สมัครสมาชิกฟรี</a>
+        {t.noAccount}{" "}
+        <a href={`/${lang}/register`} className="text-ap-blue font-semibold hover:opacity-70">{t.register}</a>
       </p>
     </div>
   );

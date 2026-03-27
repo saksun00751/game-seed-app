@@ -2,12 +2,14 @@
 import { useState, useCallback } from "react";
 import Toast from "@/components/ui/Toast";
 import BetClassicForm from "./BetClassicForm";
+import { useLang } from "@/lib/i18n/context";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 import {
   BetTypeId, TabId, BillRow,
   MAX_DIGITS, TABS, DOUBLED, TRIPLED,
   genId, genSlipNo, permutations, nineteenDoor, addUnique,
 } from "./types";
-import type { NumberLimitRow } from "@/lib/db/lottery";
+import type { NumberLimitRow } from "@/lib/types/bet";
 
 const DB_BET_TYPE: Record<BetTypeId, string> = {
   "3top": "top3", "3tod": "tod3", "2top": "top2", "2bot": "bot2",
@@ -23,6 +25,8 @@ function isBlocked(number: string, betType: BetTypeId, limits: NumberLimitRow[])
 
 interface Props {
   betType:       BetTypeId;
+  onBetTypeChange?: (id: BetTypeId) => void;
+  availableBetTypeIds?: BetTypeId[];
   lotteryName:   string;
   lotteryFlag?:  string;
   closeAt?:      string;
@@ -36,6 +40,8 @@ interface Props {
 
 export default function BetQuickForm({
   betType,
+  onBetTypeChange,
+  availableBetTypeIds = [],
   lotteryName,
   lotteryFlag,
   bills,
@@ -45,9 +51,19 @@ export default function BetQuickForm({
   onClearAll,
   onTabChange,
 }: Props) {
-  const today = new Date().toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const { lang } = useLang();
+  const t = useTranslation("bet");
+  const localeByLang: Record<string, string> = { th: "th-TH", en: "en-US", kh: "km-KH", la: "lo-LA" };
+  const dateLocale = localeByLang[lang] ?? "th-TH";
+  const today = new Date().toLocaleDateString(dateLocale, { day: "2-digit", month: "2-digit", year: "numeric" });
 
   const maxDigits = MAX_DIGITS[betType];
+  const bottomAmountLabel = maxDigits === 3 ? t.tod : t.bottom;
+  const tabLabels: Record<TabId, string> = {
+    quick: t.tabQuick,
+    classic: t.tabClassic,
+    slip: t.tabSlip,
+  };
 
   const [activeTab,   setActiveTab]   = useState<TabId>("quick");
   const [inputBuf,    setInputBuf]    = useState("");
@@ -70,7 +86,7 @@ export default function BetQuickForm({
       const allowed = valid.filter((n) => !isBlocked(n, betType, numberLimits));
       if (allowed.length > 0) setPreview((prev) => addUnique(prev, allowed));
       if (blocked.length > 0) {
-        setDupWarning(`🔒 เลข ${blocked.join(", ")} เป็นเลขอั้น ไม่สามารถแทงได้`);
+        setDupWarning(`🔒 ${t.numberLabel} ${blocked.join(", ")} ${t.blockedNumberMessage}`);
         setTimeout(() => setDupWarning(""), 3000);
       }
     }
@@ -93,12 +109,12 @@ export default function BetQuickForm({
       const allowed = expanded.filter((n) => !isBlocked(n, betType, numberLimits));
 
       if (blocked.length > 0) {
-        setDupWarning(`🔒 เลข ${blocked.join(", ")} เป็นเลขอั้น ไม่สามารถแทงได้`);
+        setDupWarning(`🔒 ${t.numberLabel} ${blocked.join(", ")} ${t.blockedNumberMessage}`);
         setTimeout(() => setDupWarning(""), 3000);
       } else {
         const dups = allowed.filter((n) => preview.includes(n));
         if (dups.length > 0) {
-          setDupWarning(`เลข ${dups.join(", ")} ซ้ำใน preview`);
+          setDupWarning(`${t.numberLabel} ${dups.join(", ")} ${t.duplicatePreviewMessage}`);
           setTimeout(() => setDupWarning(""), 2500);
         } else {
           setDupWarning("");
@@ -131,6 +147,14 @@ export default function BetQuickForm({
   }, []);
 
   const [toastMsg, setToastMsg] = useState("");
+  const specialModes: { id: BetTypeId; label: string }[] = [
+    { id: "6perm", label: t.betType6perm },
+    { id: "19door", label: t.betType19door },
+    { id: "winnum", label: t.betTypeWinnum },
+  ];
+  const visibleSpecialModes = availableBetTypeIds.length
+    ? specialModes.filter((mode) => availableBetTypeIds.includes(mode.id))
+    : specialModes;
 
   const canAddBill = preview.length > 0 && (parseFloat(topAmt) > 0 || parseFloat(botAmt) > 0);
 
@@ -147,16 +171,16 @@ export default function BetQuickForm({
       )
     );
     if (dupes.length > 0) {
-      setToastMsg(`เลข ${dupes.join(", ")} มีอยู่ในโพยแล้ว`);
+      setToastMsg(`${t.numberLabel} ${dupes.join(", ")} ${t.duplicateSlipMessage}`);
       return;
     }
 
     const slipNo = genSlipNo();
-    const time   = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+    const time   = new Date().toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" });
     const rows: BillRow[] = preview.map((num) => ({ id: genId(), slipNo, number: num, betType, top, bot, note, time }));
     onAddBills(rows);
     clearPreview();
-  }, [canAddBill, topAmt, botAmt, preview, betType, bills, note, clearPreview, onAddBills]);
+  }, [canAddBill, topAmt, botAmt, preview, betType, bills, note, clearPreview, onAddBills, dateLocale]);
 
   return (
     <>
@@ -186,7 +210,7 @@ export default function BetQuickForm({
                   ? "bg-ap-blue text-white"
                   : "bg-ap-bg text-ap-secondary hover:bg-white hover:text-ap-primary",
             ].join(" ")}>
-            {tab.label}
+            {tabLabels[tab.id]}
           </button>
         ))}
       </div>
@@ -205,29 +229,55 @@ export default function BetQuickForm({
       {activeTab !== "classic" && <div className="p-4">
         {/* Title */}
         <div className="mb-3">
-          <p className="text-[16px] font-bold text-ap-primary">{TABS.find((t) => t.id === activeTab)?.label ?? activeTab}</p>
+          <p className="text-[16px] font-bold text-ap-primary">{tabLabels[activeTab]}</p>
           <p className="text-[12px] text-ap-secondary mt-0.5">{lotteryName} • {today}</p>
         </div>
+
+        {visibleSpecialModes.length > 0 && (
+          <div className="mb-3">
+            <p className="text-[11px] text-ap-secondary font-bold mb-1.5 uppercase tracking-wide">{t.specialModeTitle}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {visibleSpecialModes.map((mode) => {
+                const active = betType === mode.id;
+                return (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => onBetTypeChange?.(mode.id)}
+                    className={[
+                      "py-2 rounded-xl text-[12px] font-bold border transition-all",
+                      active
+                        ? "bg-violet-50 border-violet-300 text-violet-700"
+                        : "bg-white border-ap-border text-ap-secondary hover:border-ap-blue/30",
+                    ].join(" ")}
+                  >
+                    {mode.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Input area */}
         {activeTab === "slip" ? (
           <div className="bg-ap-bg/50 rounded-2xl border border-ap-border p-4 mb-3">
             <label className="text-[11px] text-ap-secondary font-bold mb-1.5 block uppercase tracking-wide">
-              วางโพย — พิมพ์เลข {maxDigits} หลัก คั่นด้วยช่องว่าง
+              {t.pasteSlipLabel.replace("{digits}", String(maxDigits))}
             </label>
             <textarea
               value={slipText}
               onChange={(e) => handleSlipChange(e.target.value)}
-              placeholder={`พิมพ์เลข ${maxDigits} หลัก แล้วกด Space เพื่อเพิ่ม\nเช่น ${maxDigits === 3 ? "123 456 789" : "12 34 56"}`}
+              placeholder={`${t.pasteSlipPlaceholder.replace("{digits}", String(maxDigits))}\n${t.exampleLabel} ${maxDigits === 3 ? t.pasteSlipExample3 : t.pasteSlipExample2}`}
               rows={4}
               className="w-full border-2 border-ap-border rounded-xl px-3 py-2.5 text-[15px] font-bold text-ap-primary outline-none focus:border-ap-blue bg-white transition-all resize-none leading-relaxed"
             />
-            <p className="mt-1.5 text-[11px] text-ap-tertiary">กด Space หรือ Enter หลังแต่ละเลขเพื่อเพิ่มอัตโนมัติ</p>
+            <p className="mt-1.5 text-[11px] text-ap-tertiary">{t.pasteSlipHint}</p>
           </div>
         ) : (
           <div className="bg-ap-bg/50 rounded-2xl border border-ap-border p-4 mb-3">
             <label className="text-[11px] text-ap-secondary font-bold mb-1 block uppercase tracking-wide">
-              ใส่เลข ({maxDigits} หลัก)
+              {t.inputNumberLabel.replace("{digits}", String(maxDigits))}
             </label>
             <input
               type="text"
@@ -245,26 +295,26 @@ export default function BetQuickForm({
         <div className="rounded-2xl border border-ap-border bg-white mb-3 overflow-hidden">
           <div className="px-4 py-2 flex items-center justify-between border-b border-ap-border bg-ap-bg/60">
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-semibold text-ap-secondary uppercase tracking-wide">เลข Preview</span>
-              <span className="text-[12px] font-bold text-ap-primary tabular-nums">{preview.length} ตัว</span>
+              <span className="text-[12px] font-semibold text-ap-secondary uppercase tracking-wide">{t.previewTitle}</span>
+              <span className="text-[12px] font-bold text-ap-primary tabular-nums">{preview.length} {t.countUnit}</span>
             </div>
             <div className="flex items-center gap-1.5">
               {(betType === "2top" || betType === "2bot") && (
                 <button onClick={handleDouble}
                   className="text-[12px] font-bold px-2.5 py-1 rounded-lg border-2 border-yellow-400 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 active:scale-95 transition-all">
-                  + เลขเบิล
+                  + {t.doubleNumbers}
                 </button>
               )}
               {(betType === "3top" || betType === "3tod") && (
                 <button onClick={handleTriple}
                   className="text-[12px] font-bold px-2.5 py-1 rounded-lg border-2 border-yellow-400 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 active:scale-95 transition-all">
-                  + เลขตอง
+                  + {t.tripleNumbers}
                 </button>
               )}
               {maxDigits >= 2 && (
                 <button onClick={handleReverse} disabled={preview.length === 0}
                   className="text-[12px] font-bold px-2.5 py-1 rounded-lg bg-ap-orange text-white hover:opacity-85 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-                  🔄 เลขกลับ
+                  🔄 {t.reverseNumbers}
                 </button>
               )}
             </div>
@@ -278,7 +328,7 @@ export default function BetQuickForm({
 
           <div className="p-3 min-h-[52px] flex flex-wrap gap-1.5">
             {preview.length === 0 ? (
-              <span className="text-[13px] text-ap-tertiary self-center">— ยังไม่มีเลข กรอกด้านบนเพื่อเพิ่ม —</span>
+              <span className="text-[13px] text-ap-tertiary self-center">— {t.previewEmpty} —</span>
             ) : (
               preview.map((n, idx) => (
                 <span key={idx}
@@ -296,7 +346,7 @@ export default function BetQuickForm({
             <div className="px-3 pb-3 flex justify-center">
               <button onClick={() => { setPreview([]); setInputBuf(""); setDupWarning(""); }}
                 className="text-[12px] font-bold px-4 py-1.5 rounded-lg bg-ap-red/10 border border-ap-red/30 text-ap-red hover:bg-ap-red hover:text-white active:scale-95 transition-all">
-                ✕ ยกเลิกทั้งหมด
+                ✕ {t.clearAll}
               </button>
             </div>
           )}
@@ -307,7 +357,7 @@ export default function BetQuickForm({
           {/* บน + ล่าง */}
           <div className="grid grid-cols-2 gap-2 mb-3">
             <div>
-              <label className="text-[11px] text-ap-secondary font-bold mb-1 block uppercase tracking-wide">บน</label>
+              <label className="text-[11px] text-ap-secondary font-bold mb-1 block uppercase tracking-wide">{t.top}</label>
               <input
                 type="number"
                 value={topAmt}
@@ -318,7 +368,7 @@ export default function BetQuickForm({
               />
             </div>
             <div>
-              <label className="text-[11px] text-ap-secondary font-bold mb-1 block uppercase tracking-wide">ล่าง</label>
+              <label className="text-[11px] text-ap-secondary font-bold mb-1 block uppercase tracking-wide">{bottomAmountLabel}</label>
               <input
                 type="number"
                 value={botAmt}
@@ -332,19 +382,19 @@ export default function BetQuickForm({
 
           {/* หมายเหตุ */}
           <div className="mb-3">
-            <label className="text-[11px] text-ap-secondary font-bold mb-1 block uppercase tracking-wide">หมายเหตุ</label>
+            <label className="text-[11px] text-ap-secondary font-bold mb-1 block uppercase tracking-wide">{t.note}</label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="ระบุหมายเหตุ (ถ้ามี)"
+              placeholder={t.notePlaceholder}
               className="w-full border border-ap-border bg-white rounded-xl px-3 py-2.5 text-[13px] outline-none focus:border-ap-blue transition-all"
             />
           </div>
 
           {/* Hint */}
           {preview.length > 0 && !parseFloat(topAmt) && !parseFloat(botAmt) && (
-            <p className="mb-2 text-[11px] text-ap-red font-medium">⚠ กรุณากรอกยอด บน หรือ ล่าง ก่อนเพิ่มบิล</p>
+            <p className="mb-2 text-[11px] text-ap-red font-medium">⚠ {t.fillAmountHint.replace("{bottom}", bottomAmountLabel)}</p>
           )}
 
           {/* + เพิ่มบิล */}
@@ -355,7 +405,7 @@ export default function BetQuickForm({
                   ? "bg-ap-primary hover:bg-black text-white active:scale-95 shadow-md"
                   : "bg-ap-bg border-2 border-dashed border-ap-border text-ap-tertiary cursor-not-allowed",
               ].join(" ")}>
-              + เพิ่มบิล
+              + {t.addBill}
             </button>
           </div>
         </div>

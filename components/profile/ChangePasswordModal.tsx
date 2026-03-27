@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { changePasswordAction } from "@/lib/actions";
+import { useLang } from "@/lib/i18n/context";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const LockIcon = () => (
@@ -95,6 +96,7 @@ function SubmitButton() {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function ChangePasswordModal({ hasPassword }: { hasPassword: boolean }) {
+  const { lang } = useLang();
   const [state, action] = useActionState(changePasswordAction, {});
   const [oldPw,     setOldPw]     = useState("");
   const [newPw,     setNewPw]     = useState("");
@@ -114,7 +116,7 @@ export default function ChangePasswordModal({ hasPassword }: { hasPassword: bool
   }, [state.success]);
 
   return (
-    <div className="max-w-lg mx-auto px-5 pt-6">
+    <div className="max-w-5xl mx-auto px-5 pt-6">
       <div className="bg-white rounded-3xl border border-ap-border shadow-card overflow-hidden">
 
         {/* Header */}
@@ -140,7 +142,7 @@ export default function ChangePasswordModal({ hasPassword }: { hasPassword: bool
             <p className="text-[17px] font-bold text-ap-primary">เปลี่ยนรหัสผ่านสำเร็จ!</p>
             <p className="text-[13px] text-ap-secondary mt-1">รหัสผ่านของคุณได้รับการอัปเดตแล้ว</p>
             <a
-              href="/profile"
+              href={`/${lang}/profile`}
               className="mt-6 flex items-center justify-center w-full bg-ap-blue text-white rounded-full py-3 text-[14px] font-semibold hover:bg-ap-blue-h transition-colors"
             >
               กลับหน้าโปรไฟล์
@@ -244,7 +246,7 @@ export default function ChangePasswordModal({ hasPassword }: { hasPassword: bool
             </div>
 
             <p className="text-center text-[12px] text-ap-tertiary pb-1">
-              <a href="/profile" className="hover:text-ap-secondary transition-colors">← กลับหน้าโปรไฟล์</a>
+              <a href={`/${lang}/profile`} className="hover:text-ap-secondary transition-colors">← กลับหน้าโปรไฟล์</a>
             </p>
           </form>
         )}

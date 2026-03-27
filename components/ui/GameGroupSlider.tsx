@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import type { GameSeamlessRow } from "@/lib/db/games";
+import type { GameProviderItem } from "@/lib/api/games";
+import { useLang } from "@/lib/i18n/context";
 
 interface Props {
-  games:    GameSeamlessRow[];
+  games:    GameProviderItem[];
   gameType: string;
 }
 
@@ -12,6 +13,7 @@ export default function GameGroupSlider({ games, gameType }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const idxRef   = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { lang } = useLang();
 
   const scrollTo = (i: number) => {
     const el = trackRef.current;
@@ -45,19 +47,19 @@ export default function GameGroupSlider({ games, gameType }: Props) {
       >
         {games.map((g) => (
           <Link
-            key={g.code}
-            href={`/games/${gameType}/${g.id.toLowerCase()}`}
+            key={g.id}
+            href={`/${lang}/games/${gameType}/${g.id.toLowerCase()}`}
             className="group flex-shrink-0 w-[96px] sm:w-[140px] flex flex-col items-center gap-2 text-center active:scale-[0.97] transition-all"
           >
             <div className="w-full aspect-[3/5] rounded-2xl overflow-hidden">
               <img
-                src={`https://service.1168lot.com/storage/game_img/${g.filepic}`}
+                src={g.filepic}
                 alt={g.id}
                 className="w-full h-full object-cover rounded-2xl group-hover:scale-110 transition-transform duration-300"
               />
             </div>
             <p className="text-[11px] font-semibold text-ap-primary leading-tight line-clamp-2 w-full">
-              {g.id}
+              {g.name}
             </p>
           </Link>
         ))}

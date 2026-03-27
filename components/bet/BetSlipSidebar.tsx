@@ -1,38 +1,52 @@
 "use client";
 import { useState } from "react";
-import { BetTypeId, BillRow, BET_RATE, betTypeLabel } from "./types";
-import type { BetRateRow } from "@/lib/db/lottery";
+import { BetTypeId, BillRow, betTypeLabel } from "./types";
 import BetConfirmModal from "./BetConfirmModal";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 import Toast from "@/components/ui/Toast";
+import { useLang } from "@/lib/i18n/context";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 interface Props {
   bills:        BillRow[];
+  drawId?:      number | null;
   lotteryName:  string;
   closeAt?:     string;
   totalAmount:  number;
-  totalMaxWin:  number;
-  betRates?:    BetRateRow[];
   onDelete:     (id: string) => void;
   onClearAll:   () => void;
-  onConfirm:    () => Promise<{ ok: boolean; error?: string }>;
+  onConfirm:    () => Promise<{ ok: boolean; error?: string; message?: string }>;
+}
+
+function getAmountLabel(betType: BetTypeId, side: "top" | "bot", t: Record<string, string>): string {
+  if (side === "top") {
+    if (betType === "3top" || betType === "2top" || betType === "6perm" || betType === "19door" || betType === "winnum") return t.top;
+    if (betType === "3tod") return t.tod;
+    if (betType === "2bot") return t.bottom;
+    if (betType === "run") return t.betTypeRun;
+    return t.betTypeWinlay;
+  }
+  if (betType === "3top" || betType === "3tod" || betType === "6perm") return t.tod;
+  if (betType === "2top" || betType === "2bot" || betType === "19door" || betType === "winnum") return t.bottom;
+  if (betType === "run") return t.betTypeRun;
+  return t.betTypeWinlay;
 }
 
 export default function BetSlipSidebar({
   bills,
+  drawId,
   lotteryName,
   closeAt,
   totalAmount,
-  totalMaxWin,
-  betRates = [],
   onDelete,
   onClearAll,
   onConfirm,
 }: Props) {
-  const rateMap = betRates.length
-    ? Object.fromEntries(betRates.map((r) => [r.id, parseFloat(r.rate)])) as Partial<Record<BetTypeId, number>>
-    : {} as Partial<Record<BetTypeId, number>>;
-  const getRate = (id: BetTypeId) => rateMap[id] ?? BET_RATE[id];
+  const { lang } = useLang();
+  const t = useTranslation("bet");
+  const localeByLang: Record<string, string> = { th: "th-TH", en: "en-US", kh: "km-KH", la: "lo-LA" };
+  const numberLocale = localeByLang[lang] ?? "th-TH";
+  const getBetTypeLabel = (id: BetTypeId) => (t[`betType${id}` as keyof typeof t] as string) ?? betTypeLabel(id);
   const [showModal,  setShowModal]  = useState(false);
   const [closedToast, setClosedToast] = useState(false);
 
@@ -45,9 +59,7 @@ export default function BetSlipSidebar({
   }
 
   const handleConfirm = async () => {
-    const result = await onConfirm();
-    if (result.ok) setShowModal(false);
-    return result;
+    return onConfirm();
   };
 
   return (
@@ -57,8 +69,6 @@ export default function BetSlipSidebar({
         bills={bills}
         lotteryName={lotteryName}
         totalAmount={totalAmount}
-        totalMaxWin={totalMaxWin}
-        betRates={betRates}
         onConfirm={handleConfirm}
         onCancel={() => setShowModal(false)}
       />
@@ -71,15 +81,15 @@ export default function BetSlipSidebar({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-[18px]">📋</span>
-              <span className="text-[15px] font-bold text-ap-primary">โพยหวย</span>
+              <span className="text-[15px] font-bold text-ap-primary">{t.slipTitle}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[12px] font-bold text-white bg-ap-blue px-2.5 py-0.5 rounded-full">
-                {bills.length} รายการ
+                {bills.length} {t.items}
               </span>
               {bills.length > 0 && (
                 <button onClick={onClearAll} className="text-[12px] font-semibold text-ap-red hover:underline">
-                  ล้างทั้งหมด
+                  {t.clearAll}
                 </button>
               )}
             </div>
@@ -94,14 +104,17 @@ export default function BetSlipSidebar({
         {bills.length === 0 ? (
           <div className="py-14 flex flex-col items-center gap-2">
             <span className="text-[48px]">📋</span>
-            <p className="text-[13px] font-semibold text-ap-primary">ยังไม่มีรายการ</p>
-            <p className="text-[12px] text-ap-secondary">กรอกตัวเลขแล้วกดเพิ่ม</p>
+            <p className="text-[13px] font-semibold text-ap-primary">{t.noItems}</p>
+            <p className="text-[12px] text-ap-secondary">{t.enterAndAdd}</p>
           </div>
         ) : (
           <div className="divide-y divide-ap-border max-h-[480px] overflow-y-auto">
             {[...bills].reverse().map((b) => {
               const amt    = b.top + b.bot;
-              const maxWin = amt * getRate(b.betType);
+              const amountRows = [
+                b.top > 0 ? { side: "top" as const, amount: b.top } : null,
+                b.bot > 0 ? { side: "bot" as const, amount: b.bot } : null,
+              ].filter(Boolean) as { side: "top" | "bot"; amount: number }[];
               return (
                 <div key={b.id} className="px-4 py-3 flex items-center gap-3 hover:bg-ap-bg/40 transition-colors">
                   {/* Number box */}
@@ -112,28 +125,29 @@ export default function BetSlipSidebar({
                   {/* Middle */}
                   <div className="flex-1 min-w-0">
                     <span className="inline-block text-[11px] font-bold text-violet-600 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full mb-1.5">
-                      {betTypeLabel(b.betType)}
+                      {getBetTypeLabel(b.betType)}
                     </span>
-                    <p className="text-[13px] font-bold tabular-nums">
-                      {b.top > 0 && <span className="text-ap-blue"><span className="text-[11px] font-semibold">บน </span>{b.top}</span>}
-                      {b.top > 0 && b.bot > 0 && <span className="text-ap-tertiary mx-1">×</span>}
-                      {b.bot > 0 && <span className="text-ap-green"><span className="text-[11px] font-semibold">ล่าง </span>{b.bot}</span>}
-                    </p>
+                    <div className="space-y-0.5">
+                      {amountRows.map((row, idx) => (
+                        <p key={`${b.id}-${row.side}-${idx}`} className="text-[13px] font-bold tabular-nums">
+                          <span className={row.side === "top" ? "text-ap-blue" : "text-ap-green"}>
+                            <span className="text-[11px] font-semibold">{getAmountLabel(b.betType, row.side, t as Record<string, string>)} </span>
+                            {row.amount}
+                          </span>
+                        </p>
+                      ))}
+                    </div>
                   </div>
 
-                  {/* Right: ลบ (top) + ยอดแทง + ชนะสูงสุด */}
+                  {/* Right: ลบ + ยอดแทง */}
                   <div className="text-right flex-shrink-0 flex flex-col items-end">
                     <button onClick={() => onDelete(b.id)}
                       className="text-[10px] text-ap-red hover:underline mb-1.5">
-                      ลบ
+                      {t.delete}
                     </button>
-                    <p className="text-[10px] text-ap-tertiary">ยอดแทง</p>
+                    <p className="text-[10px] text-ap-tertiary">{t.totalBet}</p>
                     <p className="text-[13px] font-bold text-ap-primary tabular-nums">
-                      ฿{amt.toLocaleString("th-TH")}
-                    </p>
-                    <p className="text-[10px] text-ap-tertiary mt-0.5">ชนะสูงสุด</p>
-                    <p className="text-[12px] font-bold text-ap-green tabular-nums">
-                      ฿{maxWin.toLocaleString("th-TH")}
+                      ฿{amt.toLocaleString(numberLocale)}
                     </p>
                   </div>
                 </div>
@@ -147,23 +161,17 @@ export default function BetSlipSidebar({
           <div className="border-t border-ap-border">
             <div className="px-4 py-3 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[12px] text-ap-secondary">จำนวนรายการ</span>
-                <span className="text-[12px] font-semibold text-ap-primary">{bills.length} รายการ</span>
+                <span className="text-[12px] text-ap-secondary">{t.totalItems}</span>
+                <span className="text-[12px] font-semibold text-ap-primary">{bills.length} {t.items}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[16px] text-ap-secondary">ยอดรวมแทง</span>
+                <span className="text-[16px] text-ap-secondary">{t.totalBet}</span>
                 <span className="text-[22px] font-bold text-ap-primary tabular-nums">
-                  ฿{totalAmount.toLocaleString("th-TH")}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] text-ap-secondary">ชนะสูงสุด</span>
-                <span className="text-[15px] font-bold text-ap-green tabular-nums">
-                  ฿{totalMaxWin.toLocaleString("th-TH")}
+                  ฿{totalAmount.toLocaleString(numberLocale)}
                 </span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-ap-border">
-                <span className="text-[16px] text-ap-red font-semibold">⏱ ปิดรับใน</span>
+                <span className="text-[16px] text-ap-red font-semibold">⏱ {t.closeIn}</span>
                 {closeAt
                   ? <CountdownTimer closeAt={closeAt} className="text-[16px] font-bold text-ap-red tabular-nums" />
                   : <span className="text-[16px] font-bold text-ap-red tabular-nums">—</span>
@@ -173,17 +181,18 @@ export default function BetSlipSidebar({
             <div className="px-4 pb-4">
               <button onClick={handleOpenModal}
                 className="w-full bg-ap-blue hover:bg-ap-blue-h text-white font-bold text-[14px] py-3 rounded-2xl transition-colors active:scale-[0.98]">
-                ยืนยันแทงหวย
+                {t.confirmBet}
               </button>
             </div>
           </div>
         )}
+
       </div>
     </div>
 
     {closedToast && (
       <Toast
-        message="หวยปิดรับแล้ว ไม่สามารถแทงได้"
+        message={t.closedBetToast}
         type="warning"
         onClose={() => setClosedToast(false)}
       />

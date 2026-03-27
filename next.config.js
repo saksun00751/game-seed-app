@@ -6,6 +6,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'service.1168lot.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'api.1168lot.com',
+      },
     ],
   },
 }

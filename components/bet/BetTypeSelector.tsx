@@ -1,23 +1,24 @@
 "use client";
 import { BetTypeId, BET_TYPE_BTNS } from "./types";
-import type { BetRateRow } from "@/lib/db/lottery";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 interface Props {
   betType:   BetTypeId;
   onChange:  (id: BetTypeId) => void;
-  betRates?: BetRateRow[];
+  visibleIds?: BetTypeId[];
   disabled?: boolean;
 }
 
-export default function BetTypeSelector({ betType, onChange, betRates = [], disabled = false }: Props) {
-  // ถ้ามี betRates จาก DB ใช้นั้น ถ้าไม่มีใช้ hardcode fallback
-  const buttons = betRates.length > 0
-    ? betRates.map((r) => ({ id: r.id, label: r.label, rate: r.rate }))
-    : BET_TYPE_BTNS.map((b) => ({ id: b.id, label: b.label, rate: b.rate }));
+export default function BetTypeSelector({ betType, onChange, visibleIds, disabled = false }: Props) {
+  const t = useTranslation("bet");
+  const buttons = visibleIds?.length
+    ? BET_TYPE_BTNS.filter((b) => visibleIds.includes(b.id))
+    : BET_TYPE_BTNS;
+  const getBetTypeLabel = (id: BetTypeId) => (t[`betType${id}` as keyof typeof t] as string | undefined) ?? id;
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-card border border-ap-border p-4">
-      <p className="text-[12px] font-semibold text-ap-secondary uppercase tracking-wider mb-3">ประเภทการแทง</p>
+      <p className="text-[12px] font-semibold text-ap-secondary uppercase tracking-wider mb-3">{t.betTypeTitle}</p>
       <div className="grid grid-cols-3 gap-2">
         {buttons.map((bt) => {
           const active = betType === bt.id;
@@ -35,10 +36,7 @@ export default function BetTypeSelector({ betType, onChange, betRates = [], disa
                 "w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all",
                 active && !disabled ? "border-violet-500 bg-violet-500" : "border-ap-border bg-white",
               ].join(" ")} />
-              <div>
-                <p className={`text-[13px] font-bold leading-tight ${active && !disabled ? "text-violet-700" : "text-ap-primary"}`}>{bt.label}</p>
-                <p className={`text-[11px] mt-0.5 ${active && !disabled ? "text-violet-500" : "text-ap-secondary"}`}>จ่าย {bt.rate}x</p>
-              </div>
+              <p className={`text-[13px] font-bold leading-tight ${active && !disabled ? "text-violet-700" : "text-ap-primary"}`}>{getBetTypeLabel(bt.id)}</p>
             </button>
           );
         })}

@@ -15,9 +15,13 @@ export interface OtpState {
 export interface RegisterState {
   error?: string;
   fieldErrors?: {
-    phone?: string;
+    user_name?: string;
     password?: string;
     confirmPassword?: string;
+    firstname?: string;
+    lastname?: string;
+    bank?: string;
+    acc_no?: string;
   };
   success?: boolean;
   phone?: string;
@@ -50,6 +54,12 @@ export interface PlaceBetState {
   success?: boolean;
   slipId?: string;
   totalAmount?: number;
+}
+
+export interface WithdrawState {
+  error?:   string;
+  success?: boolean;
+  amount?:  number;
 }
 
 export interface SessionInfo {

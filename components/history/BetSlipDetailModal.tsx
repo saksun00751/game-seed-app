@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import type { BetSlipDetail } from "@/lib/db/bets";
+import { useEffect, useRef, useState } from "react";
+import type { BetSlipDetail } from "@/lib/types/bet";
+import { cancelSlip } from "@/app/actions/history";
+import Toast from "@/components/ui/Toast";
 
 const STATUS_STYLE: Record<string, string> = {
   confirmed: "bg-ap-blue/10 text-ap-blue",
@@ -23,6 +25,9 @@ interface Props {
 
 export default function BetSlipDetailModal({ slip, onClose }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState(slip.status);
+  const [cancelling, setCancelling] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error" | "warning"; message: string } | null>(null);
 
   // ปิดด้วย Escape
   useEffect(() => {
@@ -46,6 +51,20 @@ export default function BetSlipDetailModal({ slip, onClose }: Props) {
 
   const winItems  = slip.items.filter((i) => i.isWin === true);
   const totalWin  = winItems.reduce((s, i) => s + (i.actualPayout ?? i.payout), 0);
+  const canCancel = status === "active" || status === "confirmed" || status === "pending";
+
+  async function handleCancelSlip() {
+    if (!canCancel || cancelling) return;
+    setCancelling(true);
+    const result = await cancelSlip(slip.id);
+    if (result.ok) {
+      setStatus("cancelled");
+      setToast({ type: "success", message: result.message });
+    } else {
+      setToast({ type: "error", message: result.message });
+    }
+    setCancelling(false);
+  }
 
   return (
     <div
@@ -64,8 +83,8 @@ export default function BetSlipDetailModal({ slip, onClose }: Props) {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-[16px] font-bold text-ap-primary">{slip.lotteryName}</h2>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLE[slip.status] ?? "bg-ap-bg text-ap-secondary"}`}>
-                  {STATUS_LABEL[slip.status] ?? slip.status}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLE[status] ?? "bg-ap-bg text-ap-secondary"}`}>
+                  {STATUS_LABEL[status] ?? status}
                 </span>
               </div>
               <p className="text-[12px] text-ap-tertiary">
@@ -149,7 +168,7 @@ export default function BetSlipDetailModal({ slip, onClose }: Props) {
               ยอดแทง ฿{slip.totalAmount.toLocaleString("th-TH")}
             </span>
           </div>
-          {slip.status === "won" && totalWin > 0 ? (
+          {status === "won" && totalWin > 0 ? (
             <div className="flex justify-between items-center">
               <span className="text-[13px] text-ap-secondary">ได้รับจริง</span>
               <span className="text-[16px] font-bold text-ap-green tabular-nums">+฿{totalWin.toLocaleString("th-TH")}</span>
@@ -160,9 +179,29 @@ export default function BetSlipDetailModal({ slip, onClose }: Props) {
               <span className="text-[14px] font-semibold text-ap-tertiary tabular-nums">฿{slip.totalPayout.toLocaleString("th-TH")}</span>
             </div>
           )}
+          {canCancel && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleCancelSlip}
+                disabled={cancelling}
+                className="w-full py-2.5 rounded-xl bg-ap-red text-white text-[13px] font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
+              >
+                {cancelling ? "กำลังยกเลิก..." : "ยกเลิกโพย"}
+              </button>
+            </div>
+          )}
         </div>
 
       </div>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          durationMs={5000}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

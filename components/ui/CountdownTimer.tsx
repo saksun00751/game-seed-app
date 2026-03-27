@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLang } from "@/lib/i18n/context";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
+type LangCode = "th" | "en" | "kh" | "la";
 
-function format(closeAt: string, expiredText: string): string {
+const DATE_LOCALE_BY_LANG: Record<LangCode, string> = {
+  th: "th-TH",
+  en: "en-US",
+  kh: "km-KH",
+  la: "lo-LA",
+};
+
+function format(closeAt: string, expiredText: string, dayText: string, dateLocale: string): string {
   const diffMs = new Date(closeAt).getTime() - Date.now();
   if (diffMs <= 0) return expiredText;
 
@@ -14,13 +24,13 @@ function format(closeAt: string, expiredText: string): string {
   const secs  = totalSec % 60;
 
   if (days > 0) {
-    const closeDate = new Date(closeAt).toLocaleString("th-TH", {
+    const closeDate = new Date(closeAt).toLocaleString(dateLocale, {
       day: "numeric",
       month: "short",
       hour: "2-digit",
       minute: "2-digit",
     });
-    return `${days} วัน (${closeDate})`;
+    return `${days} ${dayText} (${closeDate})`;
   }
   return [hours, mins, secs].map((n) => String(n).padStart(2, "0")).join(":");
 }
@@ -29,35 +39,58 @@ interface Props {
   closeAt:           string;   // ISO 8601 string
   className?:        string;
   showCurrentTime?:  boolean;
-  expiredText?:      string;
+  expiredText?:      string;   // optional override text
   expiredClassName?: string;
 }
 
-export default function CountdownTimer({ closeAt, className = "", showCurrentTime, expiredText = "ปิดรับแล้ว", expiredClassName }: Props) {
+export default function CountdownTimer({ closeAt, className = "", showCurrentTime, expiredText, expiredClassName }: Props) {
+  const { lang } = useLang();
+  const tc = useTranslation("countdown");
+  const langKey = (lang in DATE_LOCALE_BY_LANG ? lang : "th") as LangCode;
+  const expiredLabel = expiredText ?? tc.expired;
+  const textRef = useRef<HTMLSpanElement>(null);
+
   const [display,   setDisplay]  = useState("");
   const [isExpired, setIsExpired] = useState(false);
+  const [shrinkText, setShrinkText] = useState(false);
 
   useEffect(() => {
     const tick = () => {
       const expired = new Date(closeAt).getTime() <= Date.now();
       setIsExpired(expired);
-      setDisplay(format(closeAt, expiredText));
+      setDisplay(format(closeAt, expiredLabel, tc.day, DATE_LOCALE_BY_LANG[langKey]));
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [closeAt, expiredText]);
+  }, [closeAt, expiredLabel, tc.day, langKey]);
 
   const activeClass = isExpired && expiredClassName ? expiredClassName : className;
+  const finalClass = !showCurrentTime && shrinkText ? `${activeClass} text-[16px]` : activeClass;
+
+  useEffect(() => {
+    if (showCurrentTime) return;
+    const el = textRef.current;
+    if (!el) return;
+
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight || "0");
+    if (!lineHeight) {
+      setShrinkText(false);
+      return;
+    }
+
+    const lineCount = el.scrollHeight / lineHeight;
+    setShrinkText(lineCount > 2);
+  }, [display, showCurrentTime, activeClass]);
 
   if (showCurrentTime) {
     return (
       <div className="text-center">
-        <span className={activeClass}>{display}</span>
-        {!isExpired && <div className="text-[10px] text-ap-tertiary mt-0.5">ชม. · นาที · วินาที</div>}
+        <span ref={textRef} className={finalClass}>{display}</span>
+        {!isExpired && <div className="text-[10px] text-ap-tertiary mt-0.5">{tc.hms}</div>}
       </div>
     );
   }
 
-  return <span className={activeClass}>{display}</span>;
+  return <span ref={textRef} className={finalClass}>{display}</span>;
 }

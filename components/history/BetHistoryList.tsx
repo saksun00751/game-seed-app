@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { BetSlipSummary, BetSlipDetail } from "@/lib/db/bets";
+import type { BetSlipSummary, BetSlipDetail } from "@/lib/types/bet";
 import { fetchSlipDetail } from "@/app/actions/history";
 import BetSlipDetailModal from "./BetSlipDetailModal";
 

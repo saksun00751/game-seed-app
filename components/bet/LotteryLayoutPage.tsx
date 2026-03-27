@@ -1,21 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BetTypeId, BillRow, BET_RATE } from "./types";
+import { useLang } from "@/lib/i18n/context";
+import { getTranslation } from "@/lib/i18n/getTranslation";
+import { BetTypeId, BillRow, BET_TYPE_BTNS } from "./types";
 import BetLeftSidebar  from "./BetLeftSidebar";
-import type { NumberLimitRow } from "@/lib/db/lottery";
+import type { NumberLimitRow } from "@/lib/types/bet";
 import BetTypeSelector from "./BetTypeSelector";
 import BetQuickForm    from "./BetQuickForm";
 import BetSlipSidebar  from "./BetSlipSidebar";
 import { confirmBet }  from "@/app/actions/bet";
-import type { BetRateRow, PastResultRow } from "@/lib/db/lottery";
-import type { BetSlipSummary } from "@/lib/db/bets";
+import type { BetRateRow, PastResultRow, BetSlipSummary } from "@/lib/types/bet";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 
 export default function LotteryLayoutPage({
   lotteryTypeId = "",
-  lotteryName   = "หวยรัฐบาล",
+  drawId,
+  lotteryName   = "",
   lotteryFlag   = "",
   categoryName  = "",
   closeAt,
@@ -25,6 +27,7 @@ export default function LotteryLayoutPage({
   pastResults   = [],
 }: {
   lotteryTypeId?: string;
+  drawId?:       number;
   lotteryName?:  string;
   lotteryFlag?:  string;
   categoryName?: string;
@@ -34,17 +37,25 @@ export default function LotteryLayoutPage({
   myBetHistory?: BetSlipSummary[];
   pastResults?:  PastResultRow[];
 }) {
+  const { lang } = useLang();
+  const t = getTranslation(lang, "bet");
   const [bills,     setBills]     = useState<BillRow[]>([]);
   const [betType,   setBetType]   = useState<BetTypeId>("3top");
   const [isClassic, setIsClassic] = useState(false);
+  const availableBetTypeIds = betRates.map((r) => r.id);
+  const specialTypes: BetTypeId[] = ["6perm", "19door", "winnum"];
+  const selectorTypeIds = availableBetTypeIds.length
+    ? availableBetTypeIds.filter((id) => !specialTypes.includes(id))
+    : BET_TYPE_BTNS.map((b) => b.id).filter((id) => !specialTypes.includes(id));
 
-  const rateMap = betRates.length
-    ? Object.fromEntries(betRates.map((r) => [r.id, parseFloat(r.rate)])) as Partial<Record<BetTypeId, number>>
-    : {} as Partial<Record<BetTypeId, number>>;
-  const getRate = (id: BetTypeId) => rateMap[id] ?? BET_RATE[id];
+  useEffect(() => {
+    if (!availableBetTypeIds.length) return;
+    if (!availableBetTypeIds.includes(betType)) {
+      setBetType(availableBetTypeIds[0]);
+    }
+  }, [availableBetTypeIds, betType]);
 
   const totalAmount = bills.reduce((s, b) => s + b.top + b.bot, 0);
-  const totalMaxWin = bills.reduce((s, b) => s + (b.top + b.bot) * getRate(b.betType), 0);
 
   const handleAddBills = (rows: BillRow[]) => setBills((prev) => [...prev, ...rows]);
   const handleDelete   = (id: string)      => setBills((prev) => prev.filter((b) => b.id !== id));
@@ -52,7 +63,7 @@ export default function LotteryLayoutPage({
   const changeBetType  = (t: BetTypeId)   => setBetType(t);
 
   const handleConfirm = async () => {
-    const result = await confirmBet(lotteryTypeId, bills);
+    const result = await confirmBet(drawId, bills);
     if (result.ok) setBills([]);
     return result;
   };
@@ -63,12 +74,12 @@ export default function LotteryLayoutPage({
       {/* ── Breadcrumb bar ─────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-ap-border px-4 py-2.5 flex items-center justify-between sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-2 text-[14px] min-w-0">
-          <Link href="/dashboard" className="text-ap-secondary hover:text-ap-primary transition-colors shrink-0">หน้าหลัก</Link>
+          <Link href={`/${lang}/dashboard`} className="text-ap-secondary hover:text-ap-primary transition-colors shrink-0">{t.home}</Link>
           <span className="text-ap-tertiary shrink-0">›</span>
-          <Link href="/bet" className="text-ap-secondary hover:text-ap-primary transition-colors shrink-0">แทงหวย</Link>
+          <Link href={`/${lang}/bet`} className="text-ap-secondary hover:text-ap-primary transition-colors shrink-0">{t.title}</Link>
           {categoryName && <>
             <span className="text-ap-tertiary shrink-0">›</span>
-            <Link href="/bet" className="text-ap-secondary hover:text-ap-primary transition-colors shrink-0 hidden sm:inline">{categoryName}</Link>
+            <Link href={`/${lang}/bet`} className="text-ap-secondary hover:text-ap-primary transition-colors shrink-0 hidden sm:inline">{categoryName}</Link>
           </>}
           <span className="text-ap-tertiary shrink-0">›</span>
           <span className="font-bold text-ap-primary truncate">{lotteryFlag && <span className="mr-1">{lotteryFlag}</span>}{lotteryName}</span>
@@ -92,9 +103,11 @@ export default function LotteryLayoutPage({
 
           {/* Main column */}
           <div className="space-y-3">
-            <BetTypeSelector betType={betType} onChange={changeBetType} betRates={betRates} disabled={isClassic} />
+            <BetTypeSelector betType={betType} onChange={changeBetType} visibleIds={selectorTypeIds} disabled={isClassic} />
             <BetQuickForm
               betType={betType}
+              onBetTypeChange={changeBetType}
+              availableBetTypeIds={availableBetTypeIds}
               lotteryName={lotteryName}
               lotteryFlag={lotteryFlag}
               closeAt={closeAt}
@@ -110,11 +123,10 @@ export default function LotteryLayoutPage({
           {/* Right sidebar */}
           <BetSlipSidebar
             bills={bills}
+            drawId={drawId}
             lotteryName={lotteryName}
             closeAt={closeAt}
             totalAmount={totalAmount}
-            totalMaxWin={totalMaxWin}
-            betRates={betRates}
             onDelete={handleDelete}
             onClearAll={handleClearAll}
             onConfirm={handleConfirm}

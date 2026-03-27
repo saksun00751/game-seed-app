@@ -1,29 +1,29 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useLang } from "@/lib/i18n/context";
 
 interface Props {
-  displayName: string;
-  bankName: string | null;
-  bankAccount: string | null;
-  balance: number;
+  displayName:  string;
+  bankAccount:  string | null;
+  balance:      number;
 }
 
-// บัญชีรับเงินของระบบ
-const ADMIN_BANK = {
-  bankName:      "ธนาคารกสิกรไทย (KBANK)",
-  accountNumber: "123-4-56789-0",
-  accountName:   "บริษัท ลอตโต้ออนไลน์ จำกัด",
-};
+interface SystemBank {
+  code:          number;
+  accName:       string;
+  accNo:         string;
+  bankName:      string;
+  bankShortcode: string;
+  qrcode:        boolean;
+  minAmount:     number;
+}
 
 const QUICK_AMOUNTS = [50, 100, 300, 500, 1000];
 
 type Method = "transfer" | "qr";
+type Phase  = "method" | "amount" | "qr" | "slip" | "done";
 
-// phase กำหนด flow ทั้งหมด — QR มี "qr" phase เพิ่ม
-type Phase = "method" | "amount" | "qr" | "slip" | "done";
-
-// map phase → visual step number ต่างกันตาม method
 function toVisualStep(phase: Phase, method: Method | null): number {
   if (method === "qr") {
     return { method: 1, amount: 2, qr: 3, slip: 4, done: 5 }[phase];
@@ -108,16 +108,39 @@ function Notes() {
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
-export default function DepositPage({ displayName, bankName, bankAccount, balance }: Props) {
+export default function DepositPage({ displayName, bankAccount, balance }: Props) {
+  const { lang } = useLang();
+
   const [phase,       setPhase]       = useState<Phase>("method");
   const [method,      setMethod]      = useState<Method | null>(null);
   const [amount,      setAmount]      = useState("");
   const [slip,        setSlip]        = useState<File | null>(null);
   const [slipPreview, setSlipPreview] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [depositId,   setDepositId]   = useState<string | null>(null);
 
-  const amountNum     = parseFloat(amount) || 0;
-  const isValidAmount = amountNum >= 50;
+  // ── System bank account (load-balanced from DB) ────────────────────────────
+  const [systemBank,    setSystemBank]    = useState<SystemBank | null>(null);
+  const [bankLoading,   setBankLoading]   = useState(false);
+  const [bankError,     setBankError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    setBankLoading(true);
+    fetch("/api/deposit/bank")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) setSystemBank(data.account);
+        else setBankError(data.message ?? "ไม่สามารถโหลดบัญชีรับเงินได้");
+      })
+      .catch(() => setBankError("ไม่สามารถเชื่อมต่อระบบได้"))
+      .finally(() => setBankLoading(false));
+  }, []);
+
+  const fileRef      = useRef<HTMLInputElement>(null);
+  const amountNum    = parseFloat(amount) || 0;
+  const minAmt       = systemBank?.minAmount ?? 50;
+  const isValidAmount = amountNum >= minAmt;
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -132,13 +155,40 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
     return acc.length > 4 ? `${"X".repeat(acc.length - 4)}-${acc.slice(-4)}` : acc;
   }
 
-  // ปุ่ม "ถัดไป" จาก amount: QR → phase qr, transfer → phase slip
   function onAmountNext() {
     setPhase(method === "qr" ? "qr" : "slip");
   }
 
+  async function handleConfirmDeposit() {
+    if (!systemBank || !slip) return;
+    setSubmitting(true);
+    setSubmitError(null);
+
+    const fd = new FormData();
+    fd.append("amount",       String(amountNum));
+    fd.append("method",       method ?? "transfer");
+    fd.append("accountCode",  String(systemBank.code));
+    fd.append("bankShortcode", systemBank.bankShortcode);
+    fd.append("slip",         slip);
+
+    try {
+      const res  = await fetch("/api/deposit/submit", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.success) {
+        setDepositId(data.depositId ?? null);
+        setPhase("done");
+      } else {
+        setSubmitError(data.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      }
+    } catch {
+      setSubmitError("ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <div className="max-w-lg mx-auto px-5 pt-6">
+    <div className="max-w-5xl mx-auto px-5 pt-6">
 
       {/* Balance card */}
       <div className="bg-white rounded-2xl border border-ap-border shadow-card px-5 py-4 mb-3">
@@ -155,7 +205,7 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[14px] font-semibold text-ap-primary">{displayName}</p>
-              <p className="text-[12px] text-ap-secondary mt-0.5">{bankName}</p>
+              <p className="text-[12px] text-ap-secondary mt-0.5">{systemBank?.bankName ?? ""}</p>
             </div>
             <p className="text-[14px] font-mono font-semibold text-ap-primary tracking-wider">
               {maskAccount(bankAccount)}
@@ -174,14 +224,31 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
         {phase === "method" && (
           <div className="space-y-3 animate-fade-up">
             <h2 className="text-[17px] font-bold text-ap-primary mb-4">เลือกวิธีฝากเงิน</h2>
+
+            {/* Bank loading / error state */}
+            {bankLoading && (
+              <div className="flex items-center gap-2 py-2">
+                <div className="w-4 h-4 rounded-full border-2 border-ap-blue border-t-transparent animate-spin" />
+                <p className="text-[13px] text-ap-secondary">กำลังโหลดข้อมูลบัญชี...</p>
+              </div>
+            )}
+            {bankError && !bankLoading && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-ap-red">
+                {bankError}
+              </div>
+            )}
+
             {([
               { id: "transfer" as Method, icon: "🏦", title: "โอนผ่านเลขบัญชี",    desc: "โอนผ่านธนาคาร / Mobile Banking" },
-              { id: "qr"       as Method, icon: "📱", title: "QR Code / PromptPay", desc: "สแกน QR พร้อมเพย์" },
+              ...(systemBank?.qrcode
+                ? [{ id: "qr" as Method, icon: "📱", title: "QR Code / PromptPay", desc: "สแกน QR พร้อมเพย์" }]
+                : []),
             ] as const).map((m) => (
               <button
                 key={m.id}
                 onClick={() => { setMethod(m.id); setPhase("amount"); }}
-                className="w-full flex items-center gap-4 border-2 border-ap-border rounded-2xl px-5 py-4 text-left hover:border-ap-blue/50 hover:bg-ap-blue/[0.02] transition-all active:scale-[0.99] group"
+                disabled={bankLoading || !!bankError || !systemBank}
+                className="w-full flex items-center gap-4 border-2 border-ap-border rounded-2xl px-5 py-4 text-left hover:border-ap-blue/50 hover:bg-ap-blue/[0.02] transition-all active:scale-[0.99] group disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <div className="w-12 h-12 rounded-2xl bg-ap-bg flex items-center justify-center text-[24px] flex-shrink-0 group-hover:bg-ap-blue/5 transition-colors">
                   {m.icon}
@@ -202,24 +269,27 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
         {phase === "amount" && (
           <div className="space-y-4 animate-fade-up">
 
-            {/* สำหรับ transfer: แสดงบัญชีรับเงิน / สำหรับ QR: แสดง hint */}
             {method === "transfer" ? (
               <div className="bg-ap-blue/5 border border-ap-blue/20 rounded-2xl p-4">
                 <p className="text-[11px] text-ap-blue font-bold uppercase tracking-wide mb-3">โอนเงินมาที่บัญชีนี้</p>
-                <div className="space-y-2">
-                  {[
-                    { label: "ธนาคาร",    value: ADMIN_BANK.bankName },
-                    { label: "เลขบัญชี", value: ADMIN_BANK.accountNumber, mono: true },
-                    { label: "ชื่อบัญชี", value: ADMIN_BANK.accountName },
-                  ].map((row) => (
-                    <div key={row.label} className="flex items-center justify-between gap-4">
-                      <span className="text-[12px] text-ap-secondary flex-shrink-0">{row.label}</span>
-                      <span className={`text-[13px] font-semibold text-ap-primary text-right ${row.mono ? "font-mono tracking-wider" : ""}`}>
-                        {row.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                {systemBank ? (
+                  <div className="space-y-2">
+                    {[
+                      { label: "ธนาคาร",    value: systemBank.bankName },
+                      { label: "เลขบัญชี", value: systemBank.accNo, mono: true },
+                      { label: "ชื่อบัญชี", value: systemBank.accName },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between gap-4">
+                        <span className="text-[12px] text-ap-secondary flex-shrink-0">{row.label}</span>
+                        <span className={`text-[13px] font-semibold text-ap-primary text-right ${row.mono ? "font-mono tracking-wider" : ""}`}>
+                          {row.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-ap-tertiary">กำลังโหลดข้อมูลบัญชี...</p>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2.5 bg-ap-blue/5 border border-ap-blue/20 rounded-2xl px-4 py-3">
@@ -232,9 +302,8 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
 
             <h2 className="text-[16px] font-bold text-ap-primary">ระบุจำนวนเงิน</h2>
 
-            {/* Quick-amount buttons */}
             <div className="grid grid-cols-5 gap-2">
-              {QUICK_AMOUNTS.map((q) => (
+              {QUICK_AMOUNTS.filter((q) => q >= minAmt).map((q) => (
                 <button
                   key={q}
                   onClick={() => setAmount(String(q))}
@@ -250,21 +319,20 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
               ))}
             </div>
 
-            {/* Custom input */}
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] font-bold text-ap-secondary select-none">฿</span>
               <input
                 type="number"
                 inputMode="numeric"
-                min={50}
+                min={minAmt}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="กรอกจำนวนเงิน (ขั้นต่ำ 50 บาท)"
+                placeholder={`กรอกจำนวนเงิน (ขั้นต่ำ ${minAmt} บาท)`}
                 className="w-full border-2 border-ap-border rounded-2xl pl-9 pr-4 py-3 text-[15px] font-semibold text-ap-primary outline-none focus:border-ap-blue focus:ring-2 focus:ring-ap-blue/10 transition-all"
               />
             </div>
             {amount !== "" && !isValidAmount && (
-              <p className="text-[12px] text-ap-red -mt-2">จำนวนขั้นต่ำ 50 บาท</p>
+              <p className="text-[12px] text-ap-red -mt-2">จำนวนขั้นต่ำ {minAmt} บาท</p>
             )}
 
             <div className="flex gap-3 pt-1">
@@ -296,10 +364,8 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
               </p>
             </div>
 
-            {/* QR display */}
             <div className="flex flex-col items-center gap-3 py-2">
               <div className="w-52 h-52 bg-white border-2 border-ap-border rounded-2xl flex flex-col items-center justify-center gap-3 shadow-sm">
-                {/* QR placeholder — ในระบบจริงใช้ library สร้าง QR */}
                 <div className="grid grid-cols-3 gap-1 opacity-60">
                   {Array.from({ length: 9 }).map((_, i) => (
                     <div
@@ -318,11 +384,12 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
               </div>
             </div>
 
-            {/* ชื่อผู้รับ */}
-            <div className="bg-ap-bg rounded-xl px-4 py-3 flex items-center justify-between">
-              <span className="text-[12px] text-ap-secondary">ผู้รับเงิน</span>
-              <span className="text-[13px] font-semibold text-ap-primary">{ADMIN_BANK.accountName}</span>
-            </div>
+            {systemBank && (
+              <div className="bg-ap-bg rounded-xl px-4 py-3 flex items-center justify-between">
+                <span className="text-[12px] text-ap-secondary">ผู้รับเงิน</span>
+                <span className="text-[13px] font-semibold text-ap-primary">{systemBank.accName}</span>
+              </div>
+            )}
 
             <div className="flex gap-3 pt-1">
               <button
@@ -353,7 +420,6 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
               </p>
             </div>
 
-            {/* Upload zone */}
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -389,19 +455,33 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
               onChange={handleFileChange}
             />
 
+            {submitError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-ap-red">
+                {submitError}
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={() => setPhase(method === "qr" ? "qr" : "amount")}
-                className="flex-1 py-3 rounded-full border-2 border-ap-border text-[14px] font-semibold text-ap-secondary hover:border-ap-blue/30 transition-colors"
+                disabled={submitting}
+                className="flex-1 py-3 rounded-full border-2 border-ap-border text-[14px] font-semibold text-ap-secondary hover:border-ap-blue/30 transition-colors disabled:opacity-40"
               >
                 ← ย้อนกลับ
               </button>
               <button
-                onClick={() => setPhase("done")}
-                disabled={!slip}
-                className="flex-1 py-3 rounded-full bg-ap-blue text-white text-[14px] font-semibold hover:bg-ap-blue-h transition-all disabled:opacity-40"
+                onClick={handleConfirmDeposit}
+                disabled={!slip || submitting}
+                className="flex-1 py-3 rounded-full bg-ap-blue text-white text-[14px] font-semibold hover:bg-ap-blue-h transition-all disabled:opacity-40 flex items-center justify-center gap-2"
               >
-                ยืนยันฝากเงิน
+                {submitting ? (
+                  <>
+                    <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    กำลังส่ง...
+                  </>
+                ) : (
+                  "ยืนยันฝากเงิน"
+                )}
               </button>
             </div>
           </div>
@@ -420,9 +500,10 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
 
             <div className="mt-5 bg-ap-bg rounded-2xl p-4 text-left space-y-2.5">
               {[
-                { label: "จำนวนเงิน", value: `฿${parseFloat(amount).toLocaleString("th-TH")}`, blue: true },
-                { label: "วิธีฝาก",  value: method === "qr" ? "QR Code / PromptPay" : "โอนผ่านเลขบัญชี" },
+                { label: "จำนวนเงิน",  value: `฿${parseFloat(amount).toLocaleString("th-TH")}`, blue: true },
+                { label: "วิธีฝาก",   value: method === "qr" ? "QR Code / PromptPay" : "โอนผ่านเลขบัญชี" },
                 { label: "ชื่อบัญชี", value: displayName },
+                ...(depositId ? [{ label: "หมายเลขอ้างอิง", value: `#${depositId}` }] : []),
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between">
                   <span className="text-[13px] text-ap-secondary">{row.label}</span>
@@ -434,7 +515,7 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
             </div>
 
             <a
-              href="/profile"
+              href={`/${lang}/profile`}
               className="mt-5 flex items-center justify-center w-full bg-ap-blue text-white rounded-full py-3.5 text-[15px] font-semibold hover:bg-ap-blue-h transition-colors"
             >
               กลับหน้าโปรไฟล์
@@ -443,7 +524,6 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
         )}
       </div>
 
-      {/* Notes */}
       {phase !== "done" && <Notes />}
     </div>
   );

@@ -1,0 +1,15 @@
+import { NextResponse } from "next/server";
+import { getApiToken, getLangCookie } from "@/lib/session/cookies";
+import { apiGet } from "@/lib/api/client";
+import type { MarketsLatestResponse } from "@/lib/api/lotto";
+
+export async function GET() {
+  const apiToken = await getApiToken();
+  if (!apiToken) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+
+  const lang = await getLangCookie();
+  const data = await apiGet<MarketsLatestResponse>("/lotto/markets/latest", apiToken, lang);
+  return NextResponse.json(data);
+}

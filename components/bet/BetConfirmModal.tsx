@@ -1,35 +1,47 @@
 "use client";
 import { useState } from "react";
-import { BetTypeId, BillRow, BET_RATE, betTypeLabel } from "./types";
-import type { BetRateRow } from "@/lib/db/lottery";
+import { BetTypeId, BillRow, betTypeLabel } from "./types";
 import Toast from "@/components/ui/Toast";
+import { useLang } from "@/lib/i18n/context";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 interface Props {
   bills:       BillRow[];
   lotteryName: string;
   totalAmount: number;
-  totalMaxWin: number;
-  betRates?:   BetRateRow[];
-  onConfirm:   () => Promise<{ ok: boolean; error?: string }>;
+  onConfirm:   () => Promise<{ ok: boolean; error?: string; message?: string }>;
   onCancel:    () => void;
+}
+
+function getAmountLabel(betType: BetTypeId, side: "top" | "bot", t: Record<string, string>): string {
+  if (side === "top") {
+    if (betType === "3top" || betType === "2top" || betType === "6perm" || betType === "19door" || betType === "winnum") return t.top;
+    if (betType === "3tod") return t.tod;
+    if (betType === "2bot") return t.bottom;
+    if (betType === "run") return t.betTypeRun;
+    return t.betTypeWinlay;
+  }
+  if (betType === "3top" || betType === "3tod" || betType === "6perm") return t.tod;
+  if (betType === "2top" || betType === "2bot" || betType === "19door" || betType === "winnum") return t.bottom;
+  if (betType === "run") return t.betTypeRun;
+  return t.betTypeWinlay;
 }
 
 export default function BetConfirmModal({
   bills,
   lotteryName,
   totalAmount,
-  totalMaxWin,
-  betRates = [],
   onConfirm,
   onCancel,
 }: Props) {
-  const rateMap = betRates.length
-    ? Object.fromEntries(betRates.map((r) => [r.id, parseFloat(r.rate)])) as Partial<Record<BetTypeId, number>>
-    : {} as Partial<Record<BetTypeId, number>>;
-  const getRate = (id: BetTypeId) => rateMap[id] ?? BET_RATE[id];
+  const { lang } = useLang();
+  const t = useTranslation("bet");
+  const localeByLang: Record<string, string> = { th: "th-TH", en: "en-US", kh: "km-KH", la: "lo-LA" };
+  const numberLocale = localeByLang[lang] ?? "th-TH";
+  const getBetTypeLabel = (id: BetTypeId) => (t[`betType${id}` as keyof typeof t] as string) ?? betTypeLabel(id);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
-  const [success, setSuccess] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
   const [shaking, setShaking] = useState(false);
 
   const handleConfirm = async () => {
@@ -37,16 +49,16 @@ export default function BetConfirmModal({
     setError("");
     const result = await onConfirm();
     if (result.ok) {
-      setSuccess(true);
-      setTimeout(onCancel, 2000);
+      setSuccessMsg(result.message ?? t.saveSuccessDefault);
+      setTimeout(onCancel, 5300);
     } else {
-      setError(result.error ?? "เกิดข้อผิดพลาด");
+      setError(result.message ?? result.error ?? t.errorUnknown);
       setShaking(true);
       setTimeout(() => setShaking(false), 450);
       setLoading(false);
     }
   };
-  const today = new Date().toLocaleDateString("th-TH", {
+  const today = new Date().toLocaleDateString(numberLocale, {
     day: "2-digit", month: "2-digit", year: "numeric",
   });
 
@@ -67,7 +79,7 @@ export default function BetConfirmModal({
         {/* Header */}
         <div className="px-5 py-4 border-b border-ap-border flex items-center justify-between shrink-0">
           <div>
-            <p className="text-[16px] font-bold text-ap-primary">ยืนยันการแทงหวย</p>
+            <p className="text-[16px] font-bold text-ap-primary">{t.confirmTitle}</p>
             <p className="text-[12px] text-ap-secondary mt-0.5">{lotteryName} • {today}</p>
           </div>
           <button onClick={onCancel}
@@ -82,12 +94,15 @@ export default function BetConfirmModal({
             <div key={slipNo} className="border-b border-ap-border last:border-0">
               <div className="px-5 py-2 bg-ap-bg/60">
                 <span className="text-[10px] font-bold text-ap-tertiary uppercase tracking-wide">
-                  โพย #{slipNo}
+                  {t.slipLabel} #{slipNo}
                 </span>
               </div>
               {items.map((b) => {
                 const amt    = b.top + b.bot;
-                const maxWin = amt * getRate(b.betType);
+                const amountRows = [
+                  b.top > 0 ? { side: "top" as const, amount: b.top } : null,
+                  b.bot > 0 ? { side: "bot" as const, amount: b.bot } : null,
+                ].filter(Boolean) as { side: "top" | "bot"; amount: number }[];
                 return (
                   <div key={b.id} className="px-5 py-2.5 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-ap-primary flex items-center justify-center shrink-0">
@@ -95,24 +110,28 @@ export default function BetConfirmModal({
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="text-[10px] font-bold text-violet-600 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full">
-                        {betTypeLabel(b.betType)}
+                        {getBetTypeLabel(b.betType)}
                       </span>
-                      <p className="text-[12px] font-bold mt-0.5 tabular-nums">
-                        {b.top > 0 && <span className="text-ap-blue"><span className="font-semibold text-[10px]">บน </span>{b.top}</span>}
-                        {b.top > 0 && b.bot > 0 && <span className="text-ap-tertiary mx-1">×</span>}
-                        {b.bot > 0 && <span className="text-ap-green"><span className="font-semibold text-[10px]">ล่าง </span>{b.bot}</span>}
-                      </p>
+                      <div className="mt-0.5 space-y-0.5">
+                        {amountRows.map((row, idx) => (
+                          <p key={`${b.id}-${row.side}-${idx}`} className="text-[12px] font-bold tabular-nums">
+                            <span className={row.side === "top" ? "text-ap-blue" : "text-ap-green"}>
+                              <span className="font-semibold text-[10px]">{getAmountLabel(b.betType, row.side, t as Record<string, string>)} </span>
+                              {row.amount}
+                            </span>
+                          </p>
+                        ))}
+                      </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-[13px] font-bold text-ap-primary tabular-nums">฿{amt.toLocaleString("th-TH")}</p>
-                      <p className="text-[10px] text-ap-green font-semibold tabular-nums">ชนะ ฿{maxWin.toLocaleString("th-TH")}</p>
+                      <p className="text-[13px] font-bold text-ap-primary tabular-nums">฿{amt.toLocaleString(numberLocale)}</p>
                     </div>
                   </div>
                 );
               })}
               {items[0]?.note && (
                 <p className="px-5 pb-2 text-[11px] text-ap-secondary">
-                  หมายเหตุ: {items[0].note}
+                  {t.note}: {items[0].note}
                 </p>
               )}
             </div>
@@ -122,36 +141,30 @@ export default function BetConfirmModal({
         {/* Summary */}
         <div className="shrink-0 border-t border-ap-border bg-ap-bg/50 px-5 py-3 space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[12px] text-ap-secondary">จำนวนรายการ</span>
-            <span className="text-[12px] font-semibold text-ap-primary">{bills.length} รายการ</span>
+            <span className="text-[12px] text-ap-secondary">{t.totalItems}</span>
+            <span className="text-[12px] font-semibold text-ap-primary">{bills.length} {t.items}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[13px] text-ap-secondary">ยอดรวมแทง</span>
+            <span className="text-[13px] text-ap-secondary">{t.totalBet}</span>
             <span className="text-[20px] font-bold text-ap-primary tabular-nums">
-              ฿{totalAmount.toLocaleString("th-TH")}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] text-ap-secondary">ชนะสูงสุด</span>
-            <span className="text-[14px] font-bold text-ap-green tabular-nums">
-              ฿{totalMaxWin.toLocaleString("th-TH")}
+              ฿{totalAmount.toLocaleString(numberLocale)}
             </span>
           </div>
         </div>
 
         {/* Toast */}
-        {success && <Toast message="ซื้อหวยสำเร็จ! 🎉" type="success" onClose={() => setSuccess(false)} />}
-        {error   && <Toast message={error}              type="error"   onClose={() => setError("")}    />}
+        {successMsg && <Toast message={successMsg} type="success" durationMs={5000} onClose={() => setSuccessMsg("")} />}
+        {error      && <Toast message={error}      type="error"   durationMs={5000} onClose={() => setError("")}      />}
 
         {/* Actions */}
         <div className="shrink-0 px-5 pb-5 pt-3 flex gap-3">
           <button onClick={onCancel} disabled={loading}
             className="flex-1 py-3 rounded-2xl border-2 border-ap-border text-[14px] font-bold text-ap-secondary hover:bg-ap-bg active:scale-[0.98] transition-all disabled:opacity-50">
-            ยกเลิก
+            {t.cancel}
           </button>
           <button onClick={handleConfirm} disabled={loading}
             className="flex-[2] py-3 rounded-2xl bg-ap-blue hover:bg-ap-blue-h text-white text-[14px] font-bold active:scale-[0.98] transition-all shadow-md disabled:opacity-70">
-            {loading ? "กำลังบันทึก..." : "บันทึก"}
+            {loading ? t.saving : t.save}
           </button>
         </div>
 

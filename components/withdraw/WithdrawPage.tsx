@@ -1,22 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useActionState } from "react";
+import { useLang } from "@/lib/i18n/context";
+import { useTranslation } from "@/lib/i18n/useTranslation";
+import { withdrawAction } from "@/lib/actions";
+import type { WithdrawState } from "@/types/auth";
 
-interface Props {
-  displayName: string;
-  bankName: string | null;
-  bankAccount: string | null;
-  balance: number;
+function t1(str: string, n: string | number) {
+  return str.replace("{n}", String(n));
 }
 
-// ─── Config (แก้ไขได้ภายหลัง) ────────────────────────────────────────────────
-const MIN_WITHDRAW    = 100;
-const MAX_PER_TX      = 40_000;
-const MAX_PER_DAY     = 10_000_000;
-const MAX_DAILY_COUNT = 10;
-const COOLDOWN_MIN    = 5;
+interface Props {
+  displayName:         string;
+  bankName:            string | null;
+  bankAccount:         string | null;
+  balance:             number;
+  withdrawMin:         number;
+  withdrawMax:         number;
+  withdrawMaxDay:      number;
+  withdrawSumToday:    number;
+  withdrawRemainToday: number;
+  withdrawLimitAmount: number;
+  canWithdraw:         boolean;
+  notice:              string | null;
+}
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const COOLDOWN_MIN = 5;
+
 function maskAccount(acc: string) {
   return acc.length > 4 ? `${"X".repeat(acc.length - 4)}-${acc.slice(-4)}` : acc;
 }
@@ -25,22 +35,33 @@ function fmt(n: number) {
   return n.toLocaleString("th-TH");
 }
 
-// ─── Notes ────────────────────────────────────────────────────────────────────
-function Notes({ usedCount, balance }: { usedCount: number; balance: number }) {
-  const remaining = MAX_DAILY_COUNT - usedCount;
+function Notes({ withdrawMin, withdrawMax, withdrawMaxDay, withdrawSumToday, withdrawRemainToday, withdrawLimitAmount }: {
+  withdrawMin:         number;
+  withdrawMax:         number;
+  withdrawMaxDay:      number;
+  withdrawSumToday:    number;
+  withdrawRemainToday: number;
+  withdrawLimitAmount: number;
+}) {
+  const tw = useTranslation("withdraw");
   const notes = [
     {
       bold: false,
       highlight: true,
-      text: `คุณสามารถใช้สิทธิการถอนได้ ${MAX_DAILY_COUNT} ครั้งต่อวัน ขณะนี้คุณใช้สิทธิถอนไปแล้ว ${usedCount} ครั้ง (เหลือ ${remaining} ครั้ง)`,
+      text: tw.noteTodaySum.replace("{sum}", fmt(withdrawSumToday)).replace("{remain}", fmt(withdrawRemainToday)),
     },
-    { bold: false, highlight: false, text: `ถอนขั้นต่ำ ครั้งละ ${fmt(MIN_WITHDRAW)} บาท` },
-    { bold: false, highlight: false, text: `ถอนสูงสุดต่อครั้ง ${fmt(MAX_PER_TX)} บาท` },
-    { bold: false, highlight: false, text: `ถอนสูงสุดต่อวัน ${fmt(MAX_PER_DAY)} บาท` },
+    { bold: false, highlight: false, text: t1(tw.noteMin, fmt(withdrawMin)) },
+    { bold: false, highlight: false, text: t1(tw.noteMax, fmt(withdrawMax)) },
+    { bold: false, highlight: false, text: t1(tw.noteMaxDay, fmt(withdrawMaxDay)) },
+    ...(withdrawLimitAmount > 0 ? [{
+      bold: false,
+      highlight: false,
+      text: t1(tw.noteLimitAmount, fmt(withdrawLimitAmount)),
+    }] : []),
     {
       bold: true,
       highlight: false,
-      text: `หากทำรายการถอนไปแล้ว โปรดรออีก ${COOLDOWN_MIN} นาทีถึงทำรายการถอนได้อีกครั้ง!!`,
+      text: t1(tw.noteCooldown, COOLDOWN_MIN),
     },
   ];
 
@@ -48,7 +69,7 @@ function Notes({ usedCount, balance }: { usedCount: number; balance: number }) {
     <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-2.5">
         <span className="text-[18px]">⚠️</span>
-        <p className="text-[12px] font-bold text-amber-700 uppercase tracking-wide">หมายเหตุสำคัญ</p>
+        <p className="text-[12px] font-bold text-amber-700 uppercase tracking-wide">{tw.noteTitle}</p>
       </div>
       <div className="space-y-2">
         {notes.map((n, i) => (
@@ -68,52 +89,59 @@ function Notes({ usedCount, balance }: { usedCount: number; balance: number }) {
   );
 }
 
-// ─── Main Component ────────────────────────────────────────────────────────────
-export default function WithdrawPage({ displayName, bankName, bankAccount, balance }: Props) {
-  const [amount,  setAmount]  = useState("");
-  const [done,    setDone]    = useState(false);
-  const [usedCount] = useState(0); // TODO: ดึงจาก DB จริง
+export default function WithdrawPage({
+  displayName, bankName, bankAccount, balance,
+  withdrawMin, withdrawMax, withdrawMaxDay,
+  withdrawSumToday, withdrawRemainToday, withdrawLimitAmount,
+  canWithdraw, notice,
+}: Props) {
+  const { lang } = useLang();
+  const tw = useTranslation("withdraw");
+  const [amount, setAmount] = useState("");
+  const [state, action, pending] = useActionState<WithdrawState, FormData>(withdrawAction, {});
 
-  const amountNum    = parseFloat(amount) || 0;
-  const isValid      = amountNum >= MIN_WITHDRAW && amountNum <= Math.min(MAX_PER_TX, balance);
+  const amountNum  = parseFloat(amount) || 0;
+  const maxAllowed = Math.min(withdrawMax, balance, withdrawRemainToday);
+  const isValid    = amountNum >= withdrawMin && amountNum <= maxAllowed && canWithdraw && !!bankAccount;
 
   const quickAmounts = [
-    { label: "100",    value: 100 },
-    { label: "300",    value: 300 },
-    { label: "500",    value: 500 },
-    { label: "ทั้งหมด", value: balance },
+    { label: fmt(withdrawMin),     value: withdrawMin },
+    { label: fmt(withdrawMin * 3), value: withdrawMin * 3 },
+    { label: fmt(withdrawMin * 5), value: withdrawMin * 5 },
+    { label: tw.all,               value: balance },
   ];
 
   function getAmountError(): string | null {
     if (!amount) return null;
-    if (amountNum < MIN_WITHDRAW)       return `ถอนขั้นต่ำ ${fmt(MIN_WITHDRAW)} บาท`;
-    if (amountNum > MAX_PER_TX)         return `ถอนสูงสุดต่อครั้ง ${fmt(MAX_PER_TX)} บาท`;
-    if (amountNum > balance)            return "ยอดคงเหลือไม่เพียงพอ";
+    if (amountNum < withdrawMin)         return t1(tw.errMin, fmt(withdrawMin));
+    if (amountNum > withdrawMax)         return t1(tw.errMax, fmt(withdrawMax));
+    if (amountNum > withdrawRemainToday) return t1(tw.errExceedToday, fmt(withdrawRemainToday));
+    if (amountNum > balance)             return tw.errInsufficient;
     return null;
   }
 
   const amountError = getAmountError();
 
-  if (done) {
+  if (state.success) {
     return (
-      <div className="max-w-lg mx-auto px-5 pt-6">
+      <div className="max-w-5xl mx-auto px-5 pt-6">
         <div className="bg-white rounded-3xl border border-ap-border shadow-card p-6 text-center">
           <div className="w-20 h-20 rounded-full bg-ap-green/10 flex items-center justify-center mx-auto mb-5">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#34c759" strokeWidth="2.2">
               <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h2 className="text-[22px] font-bold text-ap-primary">ส่งคำขอถอนเงินแล้ว!</h2>
+          <h2 className="text-[22px] font-bold text-ap-primary">{tw.successTitle}</h2>
           <p className="text-[13px] text-ap-secondary mt-1.5">
-            ระบบกำลังดำเนินการ รอไม่เกิน {COOLDOWN_MIN} นาที
+            {t1(tw.successDesc, COOLDOWN_MIN)}
           </p>
 
           <div className="mt-5 bg-ap-bg rounded-2xl p-4 text-left space-y-2.5">
             {[
-              { label: "จำนวนเงิน",  value: `฿${fmt(amountNum)}`,                blue: true },
-              { label: "โอนเข้าบัญชี", value: bankName ?? "-" },
-              { label: "เลขบัญชี",   value: bankAccount ? maskAccount(bankAccount) : "-" },
-              { label: "ชื่อบัญชี",  value: displayName },
+              { label: tw.rowAmount, value: `฿${fmt(amountNum)}`, blue: true },
+              { label: tw.rowBank,   value: bankName ?? "-" },
+              { label: tw.rowAccNo,  value: bankAccount ? maskAccount(bankAccount) : "-" },
+              { label: tw.rowName,   value: displayName },
             ].map((row) => (
               <div key={row.label} className="flex items-center justify-between">
                 <span className="text-[13px] text-ap-secondary">{row.label}</span>
@@ -125,10 +153,10 @@ export default function WithdrawPage({ displayName, bankName, bankAccount, balan
           </div>
 
           <a
-            href="/profile"
+            href={`/${lang}/profile`}
             className="mt-5 flex items-center justify-center w-full bg-ap-blue text-white rounded-full py-3.5 text-[15px] font-semibold hover:bg-ap-blue-h transition-colors"
           >
-            กลับหน้าโปรไฟล์
+            {tw.backProfile}
           </a>
         </div>
       </div>
@@ -136,11 +164,25 @@ export default function WithdrawPage({ displayName, bankName, bankAccount, balan
   }
 
   return (
-    <div className="max-w-lg mx-auto px-5 pt-6">
+    <div className="max-w-5xl mx-auto px-5 pt-6">
+
+      {/* System notice */}
+      {notice && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-2xl px-4 py-3 text-[13px] text-yellow-800 font-medium">
+          {notice}
+        </div>
+      )}
+
+      {/* Withdraw disabled */}
+      {!canWithdraw && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-[13px] text-red-700 font-medium">
+          {tw.systemClosed}
+        </div>
+      )}
 
       {/* Balance card */}
       <div className="bg-white rounded-2xl border border-ap-border shadow-card px-5 py-4 mb-3">
-        <p className="text-[11px] text-ap-tertiary uppercase tracking-wide font-medium mb-0.5">ยอดคงเหลือ</p>
+        <p className="text-[11px] text-ap-tertiary uppercase tracking-wide font-medium mb-0.5">{tw.balance}</p>
         <p className="text-[30px] font-bold text-ap-primary tabular-nums leading-tight">
           ฿{balance.toFixed(2)}
         </p>
@@ -148,7 +190,7 @@ export default function WithdrawPage({ displayName, bankName, bankAccount, balan
 
       {/* Bank info card */}
       <div className="bg-white rounded-2xl border border-ap-border shadow-card px-5 py-4 mb-5">
-        <p className="text-[11px] text-ap-tertiary uppercase tracking-wide font-medium mb-1.5">บัญชีรับเงินของฉัน</p>
+        <p className="text-[11px] text-ap-tertiary uppercase tracking-wide font-medium mb-1.5">{tw.myAccount}</p>
         {bankAccount ? (
           <div className="flex items-center justify-between">
             <div>
@@ -161,21 +203,23 @@ export default function WithdrawPage({ displayName, bankName, bankAccount, balan
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            <p className="text-[13px] text-ap-tertiary">ยังไม่ได้ผูกบัญชีธนาคาร</p>
-            <a href="/profile" className="text-[12px] text-ap-blue font-semibold">ตั้งค่า →</a>
+            <p className="text-[13px] text-ap-tertiary">{tw.noBank}</p>
+            <a href={`/${lang}/profile`} className="text-[12px] text-ap-blue font-semibold">{tw.setup}</a>
           </div>
         )}
       </div>
 
       {/* Form card */}
+      <form action={action}>
+      <input type="hidden" name="amount" value={amount} />
       <div className="bg-white rounded-3xl border border-ap-border shadow-card p-5 space-y-5">
-        <h2 className="text-[17px] font-bold text-ap-primary">ระบุจำนวนเงินที่ต้องการถอน</h2>
+        <h2 className="text-[17px] font-bold text-ap-primary">{tw.enterAmount}</h2>
 
         {/* Quick-amount buttons */}
         <div className="grid grid-cols-4 gap-2">
           {quickAmounts.map((q) => {
-            const isAll      = q.label === "ทั้งหมด";
-            const selected   = isAll
+            const isAll    = q.label === tw.all;
+            const selected = isAll
               ? parseFloat(amount) === balance
               : amount === String(q.value);
             return (
@@ -202,11 +246,11 @@ export default function WithdrawPage({ displayName, bankName, bankAccount, balan
             <input
               type="number"
               inputMode="numeric"
-              min={MIN_WITHDRAW}
-              max={Math.min(MAX_PER_TX, balance)}
+              min={withdrawMin}
+              max={maxAllowed}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder={`กรอกจำนวนเงิน (ขั้นต่ำ ${fmt(MIN_WITHDRAW)} บาท)`}
+              placeholder={t1(tw.placeholder, fmt(withdrawMin))}
               className={[
                 "w-full border-2 rounded-2xl pl-9 pr-4 py-3 text-[15px] font-semibold text-ap-primary outline-none transition-all",
                 amountError
@@ -223,24 +267,40 @@ export default function WithdrawPage({ displayName, bankName, bankAccount, balan
         {/* Summary row */}
         {isValid && (
           <div className="bg-ap-bg rounded-xl px-4 py-3 flex items-center justify-between animate-fade-in">
-            <span className="text-[12px] text-ap-secondary">จะโอนเข้า</span>
+            <span className="text-[12px] text-ap-secondary">{tw.transferTo}</span>
             <span className="text-[13px] font-semibold text-ap-primary">
               {displayName} · {bankAccount ? maskAccount(bankAccount) : "-"}
             </span>
           </div>
         )}
 
+        {/* Submit error */}
+        {state.error && (
+          <p className="text-[12px] text-ap-red font-medium text-center">{state.error}</p>
+        )}
+
         {/* Submit */}
         <button
-          onClick={() => setDone(true)}
-          disabled={!isValid || !bankAccount}
+          type="submit"
+          disabled={!isValid || pending}
           className="w-full py-3.5 rounded-full bg-ap-red text-white text-[15px] font-semibold hover:opacity-90 transition-all disabled:opacity-40 active:scale-[0.99]"
         >
-          {!bankAccount ? "กรุณาผูกบัญชีธนาคารก่อน" : `ยืนยันถอน ฿${isValid ? fmt(amountNum) : "–"}`}
+          {pending         ? tw.btnProcessing
+           : !bankAccount  ? tw.btnNoBank
+           : !canWithdraw  ? tw.btnClosed
+           : t1(tw.btnConfirm, isValid ? fmt(amountNum) : "–")}
         </button>
       </div>
+      </form>
 
-      <Notes usedCount={usedCount} balance={balance} />
+      <Notes
+        withdrawMin={withdrawMin}
+        withdrawMax={withdrawMax}
+        withdrawMaxDay={withdrawMaxDay}
+        withdrawSumToday={withdrawSumToday}
+        withdrawRemainToday={withdrawRemainToday}
+        withdrawLimitAmount={withdrawLimitAmount}
+      />
     </div>
   );
 }

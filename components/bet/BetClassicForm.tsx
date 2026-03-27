@@ -1,7 +1,9 @@
 "use client";
 import { useState, useCallback, useRef } from "react";
 import { BillRow, genId, genSlipNo, permutations } from "./types";
-import type { NumberLimitRow } from "@/lib/db/lottery";
+import type { NumberLimitRow } from "@/lib/types/bet";
+import { useLang } from "@/lib/i18n/context";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -41,6 +43,10 @@ interface Props {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function BetClassicForm({ lotteryFlag, bills, numberLimits, onAddBills }: Props) {
+  const { lang } = useLang();
+  const t = useTranslation("bet");
+  const localeByLang: Record<string, string> = { th: "th-TH", en: "en-US", kh: "km-KH", la: "lo-LA" };
+  const dateLocale = localeByLang[lang] ?? "th-TH";
   const [rows,     setRows]     = useState<ClassicRow[]>([]);
   const [inputNum, setInputNum] = useState("");
   const [note,     setNote]     = useState("");
@@ -55,7 +61,7 @@ export default function BetClassicForm({ lotteryFlag, bills, numberLimits, onAdd
   const addNumber = (num: string): string | null => {
     if (num.length < 2) return null;
     const dbType = num.length === 3 ? "top3" : "top2";
-    if (blocked(num, dbType, numberLimits)) { showToast(`เลข ${num} เป็นเลขอั้น`); return null; }
+    if (blocked(num, dbType, numberLimits)) { showToast(`${t.numberLabel} ${num} ${t.blockedNumberShort}`); return null; }
     const existing = rows.find((r) => r.number === num);
     if (existing) return existing.id;
     const newRow = makeRow(num);
@@ -131,7 +137,7 @@ export default function BetClassicForm({ lotteryFlag, bills, numberLimits, onAdd
   const handleSubmit = useCallback(() => {
     if (!canSubmit) return;
     const slipNo = genSlipNo();
-    const time   = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+    const time   = new Date().toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" });
     const newBills: BillRow[] = [];
 
     rows.forEach((row) => {
@@ -153,11 +159,11 @@ export default function BetClassicForm({ lotteryFlag, bills, numberLimits, onAdd
         ((nb.top > 0 && b.top > 0) || (nb.bot > 0 && b.bot > 0))
       )
     );
-    if (dupes.length > 0) { showToast(`เลข ${[...new Set(dupes.map((d) => d.number))].join(", ")} มีอยู่ในโพยแล้ว`); return; }
+    if (dupes.length > 0) { showToast(`${t.numberLabel} ${[...new Set(dupes.map((d) => d.number))].join(", ")} ${t.duplicateSlipMessage}`); return; }
 
     onAddBills(newBills);
     clearAll();
-  }, [canSubmit, rows, bills, note, onAddBills]);
+  }, [canSubmit, rows, bills, note, onAddBills, dateLocale, t.numberLabel, t.blockedNumberShort, t.duplicateSlipMessage]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const inputCls = "w-full text-center text-[13px] font-bold text-ap-primary outline-none bg-transparent tabular-nums py-1.5 focus:bg-ap-blue/5 transition-colors";
@@ -178,42 +184,42 @@ export default function BetClassicForm({ lotteryFlag, bills, numberLimits, onAdd
           <thead>
             <tr className="bg-ap-blue text-white">
               <th className="border border-ap-blue/40 px-2 py-2.5 text-center font-bold w-[28%]">
-                <div className="text-[12px]">หมายเลข</div>
+                <div className="text-[12px]">{t.numberLabel}</div>
                 <button
                   onClick={handleReverse}
                   className="text-[10px] text-blue-200 underline mt-0.5 hover:text-white transition-colors"
                 >
-                  (กลับเลข)
+                  ({t.reverseNumbers})
                 </button>
               </th>
               <th className="border border-ap-blue/40 px-2 py-2.5 text-center font-bold w-[21%]">
-                <div className="text-[12px]">บน</div>
+                <div className="text-[12px]">{t.top}</div>
                 <button
                   onClick={() => handleCopyCol("top")}
                   className="text-[10px] text-blue-200 underline mt-0.5 hover:text-white transition-colors"
                 >
-                  (คัดลอก)
+                  ({t.copy})
                 </button>
               </th>
               <th className="border border-ap-blue/40 px-2 py-2.5 text-center font-bold w-[21%]">
-                <div className="text-[12px]">ล่าง</div>
+                <div className="text-[12px]">{t.bottom}</div>
                 <button
                   onClick={() => handleCopyCol("bot")}
                   className="text-[10px] text-blue-200 underline mt-0.5 hover:text-white transition-colors"
                 >
-                  (คัดลอก)
+                  ({t.copy})
                 </button>
               </th>
               <th className="border border-ap-blue/40 px-2 py-2.5 text-center font-bold w-[21%]">
-                <div className="text-[12px]">โต๊ด</div>
+                <div className="text-[12px]">{t.tod}</div>
                 <button
                   onClick={() => handleCopyCol("tod")}
                   className="text-[10px] text-blue-200 underline mt-0.5 hover:text-white transition-colors"
                 >
-                  (คัดลอก)
+                  ({t.copy})
                 </button>
               </th>
-              <th className="border border-ap-blue/40 px-2 py-2.5 text-center font-bold w-[9%] text-[12px]">ลบ</th>
+              <th className="border border-ap-blue/40 px-2 py-2.5 text-center font-bold w-[9%] text-[12px]">{t.delete}</th>
             </tr>
           </thead>
           <tbody>
@@ -272,7 +278,7 @@ export default function BetClassicForm({ lotteryFlag, bills, numberLimits, onAdd
                   value={inputNum}
                   onChange={(e) => handleNumInput(e.target.value)}
                   onKeyDown={handleNumKeyDown}
-                  placeholder="พิมพ์ตัวเลข"
+                  placeholder={t.inputNumberPlaceholder}
                   maxLength={3}
                   className="w-full text-center text-[13px] font-bold text-ap-blue outline-none bg-transparent tabular-nums py-2 placeholder:text-ap-tertiary placeholder:font-normal placeholder:text-[11px]"
                 />
@@ -288,10 +294,10 @@ export default function BetClassicForm({ lotteryFlag, bills, numberLimits, onAdd
 
       {/* หมายเหตุ */}
       <div className="px-4 pb-3 pt-1 flex items-center gap-2">
-        <label className="text-[12px] text-ap-secondary font-semibold whitespace-nowrap">หมายเหตุ:</label>
+        <label className="text-[12px] text-ap-secondary font-semibold whitespace-nowrap">{t.note}:</label>
         <input
           type="text" value={note} onChange={(e) => setNote(e.target.value)}
-          placeholder="ระบุหมายเหตุ (ถ้ามี)"
+          placeholder={t.notePlaceholder}
           className="flex-1 border border-ap-border rounded-xl px-3 py-1.5 text-[12px] outline-none focus:border-ap-blue focus:ring-2 focus:ring-ap-blue/10 bg-white transition-all"
         />
         {lotteryFlag && <span className="text-[22px] leading-none">{lotteryFlag}</span>}
@@ -303,7 +309,7 @@ export default function BetClassicForm({ lotteryFlag, bills, numberLimits, onAdd
           onClick={clearAll}
           className="flex-1 py-2.5 rounded-xl border border-ap-border text-[13px] font-semibold text-ap-secondary hover:bg-ap-bg active:scale-95 transition-all"
         >
-          ล้างทั้งหมด
+          {t.clearAll}
         </button>
         <button
           onClick={handleSubmit} disabled={!canSubmit}
@@ -314,7 +320,7 @@ export default function BetClassicForm({ lotteryFlag, bills, numberLimits, onAdd
               : "bg-ap-bg border border-dashed border-ap-border text-ap-tertiary cursor-not-allowed",
           ].join(" ")}
         >
-          + เพิ่มบิล
+          + {t.addBill}
         </button>
       </div>
     </div>
