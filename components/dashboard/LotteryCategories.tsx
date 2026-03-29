@@ -8,13 +8,13 @@ import type { Category, SubItem } from "@/lib/categories";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 
 function StatusBadge({ status, t }: { status: SubItem["drawStatus"]; t: ReturnType<typeof useTranslation<"dashboard">> }) {
-  if (status === "resulted")
-    return <span className="inline-block rounded-full px-3 py-0.5 text-[11px] font-bold bg-emerald-500 text-white">{t.statusPaid}</span>;
-  if (status === "closed")
-    return <span className="inline-block rounded-full px-3 py-0.5 text-[11px] font-bold bg-orange-400 text-white">{t.statusClosing}</span>;
   if (status === "open")
-    return <span className="inline-block rounded-full px-3 py-0.5 text-[11px] font-bold bg-sky-500 text-white">{t.statusOpen}</span>;
-  return <span className="inline-block rounded-full px-3 py-0.5 text-[11px] font-bold bg-gray-300 text-gray-600">{t.statusPending}</span>;
+    return <span className="inline-block rounded-full px-3 py-0.5 text-[11px] font-bold bg-emerald-500 text-white">{t.statusOpen}</span>;
+  if (status === "closed")
+    return <span className="inline-block rounded-full px-3 py-0.5 text-[11px] font-bold bg-gray-300 text-gray-600">{t.statusClosing}</span>;
+  if (status === "resulted")
+    return <span className="inline-block rounded-full px-3 py-0.5 text-[11px] font-bold bg-gray-300 text-gray-600">{t.statusPaid}</span>;
+  return <span className="inline-block rounded-full px-3 py-0.5 text-[11px] font-bold bg-orange-400 text-white">{t.statusPending}</span>;
 }
 
 export default function LotteryCategories() {

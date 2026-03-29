@@ -26,6 +26,7 @@ interface NavbarProps {
 export default function Navbar({ logoUrl, balance, diamond, userName, userPhone }: NavbarProps) {
   const pathname = usePathname();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [langModalOpen, setLangModalOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
   const t = useTranslation("navbar");
   const { lang, setLang } = useLang();
@@ -52,7 +53,7 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone 
     { href: `/${lang}/history`,   label: t.history, icon: "📋" },
     { href: `/${lang}/bet`,       label: t.play,    icon: "🎯" },
     { href: `/${lang}/withdraw`,  label: t.withdraw, icon: "💸" },
-    { href: `/${lang}/results`,   label: t.results,  icon: "🏆" },
+    { href: `/${lang}/check-result`, label: t.checkResult, icon: "🏆" },
     { href: `/${lang}/contact`,   label: t.contact,  icon: "💬" },
   ];
 
@@ -62,7 +63,7 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone 
     { icon: "📋", label: t.history,        href: `/${lang}/history` },
     { icon: "🎁", label: t.promotion,      href: `/${lang}/promotion` },
     { icon: "💳", label: t.finance,        href: `/${lang}/transactions` },
-    { icon: "🏆", label: t.checkResult,    href: `/${lang}/results` },
+    { icon: "🏆", label: t.checkResult,    href: `/${lang}/check-result` },
     { icon: "🔐", label: t.changePassword, href: `/${lang}/change-password` },
     { icon: "🎡", label: t.spin,           href: `/${lang}/spin` },
     { icon: "🎟️", label: t.coupon,         href: `/${lang}/coupon` },
@@ -143,14 +144,12 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone 
                     <span className="text-[12px] text-ap-secondary">{t.language}</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        const idx = LANGS.findIndex((l) => l.code === lang);
-                        setLang(LANGS[(idx + 1) % LANGS.length].code);
-                      }}
+                      onClick={() => { setProfileOpen(false); setLangModalOpen(true); }}
                       className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-ap-border text-[12px] font-medium text-ap-primary hover:border-ap-blue/40 transition-all"
                     >
                       <span>{LANGS.find((l) => l.code === lang)?.flag}</span>
                       <span>{LANGS.find((l) => l.code === lang)?.label}</span>
+                      <svg className="w-3 h-3 text-ap-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 9l-7 7-7-7"/></svg>
                     </button>
                   </div>
 
@@ -217,6 +216,44 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone 
           </div>
         </div>
       </nav>
+
+      {/* Language Modal */}
+      {langModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setLangModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-card-xl border border-ap-border w-[280px] overflow-hidden animate-pop-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-ap-border">
+              <p className="text-[14px] font-semibold text-ap-primary">{t.language}</p>
+            </div>
+            <div className="p-3 flex flex-col gap-1.5">
+              {LANGS.map((l) => (
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => { setLang(l.code); setLangModalOpen(false); }}
+                  className={[
+                    "flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-medium transition-all w-full text-left",
+                    lang === l.code
+                      ? "bg-ap-blue/10 text-ap-blue border border-ap-blue/30"
+                      : "text-ap-primary hover:bg-ap-bg border border-transparent",
+                  ].join(" ")}
+                >
+                  <span className="text-[20px]">{l.flag}</span>
+                  <span>{l.label}</span>
+                  {lang === l.code && (
+                    <svg className="ml-auto w-4 h-4 text-ap-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 13l4 4L19 7"/></svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile bottom tabs */}
       <div

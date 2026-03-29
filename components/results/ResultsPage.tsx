@@ -1,86 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLang } from "@/lib/i18n/context";
+import type { MarketsLatestResponse } from "@/lib/api/lotto";
 
-interface ResultLink {
-  name:    string;
-  flag:    string;
-  closeAt: string;
-  drawAt:  string;
-  url:     string;
+interface ApiDraw {
+  close_at:        string | null;
+  result_at:       string | null;
+  draw_date:       string | null;
+  status:          string;
+  result_top_3:    string;
+  result_bottom_2: string;
 }
 
-interface Tab {
-  id:    string;
-  label: string;
-  emoji: string;
-  gradient: string;
-  items: ResultLink[];
+interface ApiMarket {
+  market_id:   number;
+  market_name: string;
+  market_logo: string;
+  market_icon: string;
+  is_enabled:  boolean;
+  latest_draw: ApiDraw;
 }
 
-const TABS: Tab[] = [
-  {
-    id:       "thai",
-    label:    "หวยไทย",
-    emoji:    "🇹🇭",
-    gradient: "from-ap-blue to-sky-400",
-    items: [
-      { name: "หวยรัฐบาล", flag: "🇹🇭", closeAt: "15:00 น.", drawAt: "15:30 น.", url: "https://www.glo.or.th" },
-      { name: "หวยออมสิน", flag: "💰",   closeAt: "10:40 น.", drawAt: "11:00 น.", url: "https://www.gsb.or.th" },
-      { name: "หวย ธ.ก.ส.", flag: "🌾",  closeAt: "10:20 น.", drawAt: "12:00 น.", url: "https://www.baac.or.th" },
-    ],
-  },
-  {
-    id:       "foreign",
-    label:    "หวยต่างประเทศ",
-    emoji:    "🌏",
-    gradient: "from-emerald-500 to-teal-400",
-    items: [
-      { name: "ฮานอย พิเศษ",  flag: "🇻🇳", closeAt: "11:50 น.", drawAt: "12:00 น.", url: "https://www.xosovietnam.net" },
-      { name: "ฮานอย 17:00",  flag: "🇻🇳", closeAt: "16:50 น.", drawAt: "17:00 น.", url: "https://www.xosovietnam.net" },
-      { name: "ฮานอย VIP",    flag: "🇻🇳", closeAt: "18:00 น.", drawAt: "18:10 น.", url: "https://www.xosovietnam.net" },
-      { name: "ฮานอย Extra",  flag: "🇻🇳", closeAt: "20:50 น.", drawAt: "21:00 น.", url: "https://www.xosovietnam.net" },
-      { name: "ลาว (รัฐบาล)", flag: "🇱🇦", closeAt: "20:10 น.", drawAt: "20:20 น.", url: "https://www.laos-lottery.com" },
-      { name: "ลาว VIP",      flag: "🇱🇦", closeAt: "20:35 น.", drawAt: "20:45 น.", url: "https://www.laos-lottery.com" },
-      { name: "ลาว Star",     flag: "🇱🇦", closeAt: "21:20 น.", drawAt: "21:30 น.", url: "https://www.laos-lottery.com" },
-      { name: "มาเลเซีย",    flag: "🇲🇾", closeAt: "18:50 น.", drawAt: "19:00 น.", url: "https://www.magnum4d.my" },
-      { name: "สิงคโปร์",    flag: "🇸🇬", closeAt: "18:20 น.", drawAt: "18:30 น.", url: "https://www.singaporepools.com.sg" },
-    ],
-  },
-  {
-    id:       "daily",
-    label:    "หวยรายวัน",
-    emoji:    "⚡",
-    gradient: "from-yellow-500 to-orange-400",
-    items: [
-      { name: "Speed ยี่กี รอบ 1", flag: "⚡", closeAt: "ทุก 5 นาที", drawAt: "ทุก 5 นาที", url: "" },
-      { name: "Speed ยี่กี รอบ 2", flag: "⚡", closeAt: "ทุก 5 นาที", drawAt: "ทุก 5 นาที", url: "" },
-      { name: "Super ยี่กี VIP",   flag: "🎰", closeAt: "ทุก 15 นาที", drawAt: "ทุก 15 นาที", url: "" },
-    ],
-  },
-  {
-    id:       "stock",
-    label:    "หวยหุ้น",
-    emoji:    "📈",
-    gradient: "from-violet-600 to-indigo-400",
-    items: [
-      { name: "หุ้นไทย เช้า",    flag: "📈", closeAt: "10:50 น.", drawAt: "11:00 น.", url: "https://www.set.or.th" },
-      { name: "หุ้นไทย บ่าย",   flag: "📊", closeAt: "14:20 น.", drawAt: "14:30 น.", url: "https://www.set.or.th" },
-      { name: "หุ้นไทย ปิด",    flag: "📉", closeAt: "16:20 น.", drawAt: "16:30 น.", url: "https://www.set.or.th" },
-      { name: "นิเคอิ เช้า",    flag: "🇯🇵", closeAt: "08:50 น.", drawAt: "09:00 น.", url: "https://www.jpx.co.jp" },
-      { name: "นิเคอิ บ่าย",    flag: "🇯🇵", closeAt: "13:50 น.", drawAt: "14:00 น.", url: "https://www.jpx.co.jp" },
-      { name: "จีน เช้า",       flag: "🇨🇳", closeAt: "09:50 น.", drawAt: "10:00 น.", url: "https://www.sse.com.cn" },
-      { name: "จีน บ่าย",       flag: "🇨🇳", closeAt: "13:50 น.", drawAt: "14:00 น.", url: "https://www.sse.com.cn" },
-      { name: "ฮั่งเส็ง เช้า",  flag: "🇭🇰", closeAt: "09:50 น.", drawAt: "10:00 น.", url: "https://www.hkex.com.hk" },
-      { name: "ฮั่งเส็ง บ่าย",  flag: "🇭🇰", closeAt: "14:20 น.", drawAt: "14:30 น.", url: "https://www.hkex.com.hk" },
-      { name: "ดาวโจนส์",       flag: "🇺🇸", closeAt: "03:50 น.", drawAt: "04:00 น.", url: "https://www.nyse.com" },
-    ],
-  },
+interface ApiGroup {
+  group_id:    number;
+  group_code:  string;
+  group_name:  string;
+  description?: string;
+  markets:     ApiMarket[];
+}
+
+const TAB_GRADIENTS = [
+  "from-ap-blue to-sky-400",
+  "from-emerald-500 to-teal-400",
+  "from-yellow-500 to-orange-400",
+  "from-violet-600 to-indigo-400",
+  "from-rose-500 to-pink-400",
+  "from-cyan-500 to-blue-400",
 ];
 
+function timeOnly(dt: string | null): string {
+  if (!dt) return "—";
+  const m = dt.match(/(\d{2}:\d{2})/);
+  return m ? `${m[1]} น.` : "—";
+}
+
 export default function ResultsPage() {
-  const [activeTab, setActiveTab] = useState("thai");
-  const tab = TABS.find((t) => t.id === activeTab)!;
+  const { lang } = useLang();
+  const [groups,   setGroups]   = useState<ApiGroup[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/lotto/markets")
+      .then((r) => r.json())
+      .then((res: MarketsLatestResponse) => {
+        const g = res?.data?.groups ?? [];
+        setGroups(g);
+        if (g.length > 0) setActiveId(g[0].group_code);
+      })
+      .catch(() => setError("ไม่สามารถโหลดข้อมูลได้"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const activeGroup = groups.find((g) => g.group_code === activeId) ?? null;
+  const gradient    = TAB_GRADIENTS[groups.findIndex((g) => g.group_code === activeId) % TAB_GRADIENTS.length] ?? TAB_GRADIENTS[0];
 
   return (
     <div className="max-w-5xl mx-auto px-5 pt-6 space-y-5">
@@ -91,75 +76,111 @@ export default function ResultsPage() {
         <p className="text-[13px] text-ap-secondary mt-0.5">รวมลิ้งค์ตรวจผลหวยทุกประเภท</p>
       </div>
 
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center gap-2 py-8 justify-center">
+          <div className="w-5 h-5 rounded-full border-2 border-ap-blue border-t-transparent animate-spin" />
+          <p className="text-[13px] text-ap-secondary">กำลังโหลด...</p>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && !loading && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-ap-red">{error}</div>
+      )}
+
       {/* Card */}
-      <div className="bg-white rounded-2xl border border-ap-border shadow-card overflow-hidden">
+      {!loading && !error && groups.length > 0 && (
+        <div className="bg-white rounded-2xl border border-ap-border shadow-card overflow-hidden">
 
-        {/* Tab bar */}
-        <div className={`bg-gradient-to-r ${tab.gradient} p-1 flex gap-1`}>
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={[
-                "flex-1 py-2 rounded-xl text-[13px] font-semibold transition-all",
-                activeTab === t.id
-                  ? "bg-white text-ap-primary shadow-sm"
-                  : "text-white/80 hover:text-white hover:bg-white/10",
-              ].join(" ")}
-            >
-              <span className="mr-1">{t.emoji}</span>
-              <span className="hidden sm:inline">{t.label}</span>
-            </button>
-          ))}
-        </div>
+          {/* Tab bar */}
+          <div className={`bg-gradient-to-r ${gradient} p-1 flex gap-1 overflow-x-auto`}>
+            {groups.map((g) => (
+              <button
+                key={g.group_code}
+                onClick={() => setActiveId(g.group_code)}
+                className={[
+                  "flex-shrink-0 flex-1 min-w-[72px] py-2 rounded-xl text-[13px] font-semibold transition-all whitespace-nowrap px-2",
+                  activeId === g.group_code
+                    ? "bg-white text-ap-primary shadow-sm"
+                    : "text-white/80 hover:text-white hover:bg-white/10",
+                ].join(" ")}
+              >
+                {g.group_name}
+              </button>
+            ))}
+          </div>
 
-        {/* Tab header */}
-        <div className={`bg-gradient-to-r ${tab.gradient} px-4 pb-3 pt-1`}>
-          <p className="text-white font-bold text-[15px]">{tab.emoji} {tab.label}</p>
-        </div>
-
-        {/* Items */}
-        <div className="divide-y divide-ap-border">
-          {tab.items.map((item) => (
-            <div key={item.name} className="flex items-center gap-4 px-4 py-3.5 hover:bg-ap-bg transition-colors">
-
-              {/* Flag */}
-              <span className="text-[28px] flex-shrink-0 w-10 text-center">{item.flag}</span>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-[14px] font-bold text-ap-primary">{item.name}</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
-                  <span className="flex items-center gap-1 text-[12px] text-ap-secondary">
-                    <span className="text-ap-red">⊗</span> ปิดรับ: {item.closeAt}
-                  </span>
-                  <span className="flex items-center gap-1 text-[12px] text-ap-secondary">
-                    <span className="text-ap-green">⊙</span> ผลออก: {item.drawAt}
-                  </span>
-                </div>
-              </div>
-
-              {/* Link */}
-              {item.url ? (
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 flex items-center gap-1.5 bg-ap-blue/10 text-ap-blue text-[12px] font-semibold px-3 py-1.5 rounded-full hover:bg-ap-blue hover:text-white transition-all"
-                >
-                  ดูผล
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                    <path d="M15 3h6v6M10 14L21 3" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </a>
-              ) : (
-                <span className="flex-shrink-0 text-[12px] text-ap-tertiary px-3 py-1.5">ในระบบ</span>
+          {/* Tab header */}
+          {activeGroup && (
+            <div className={`bg-gradient-to-r ${gradient} px-4 pb-3 pt-2`}>
+              <p className="text-white font-bold text-[15px]">{activeGroup.group_name}</p>
+              {activeGroup.description && (
+                <p className="text-white/80 text-[12px] mt-0.5 leading-relaxed">{activeGroup.description}</p>
               )}
             </div>
-          ))}
+          )}
+
+          {/* Items */}
+          <div className="divide-y divide-ap-border">
+            {activeGroup?.markets.filter((m) => m.is_enabled).map((market) => {
+              const draw      = market.latest_draw;
+              const hasResult = !!(draw.result_top_3 && draw.result_bottom_2);
+              const closeTime  = timeOnly(draw.close_at);
+              const resultTime = timeOnly(draw.result_at ?? draw.draw_date);
+
+              return (
+                <div key={market.market_id} className="flex items-center gap-3 px-4 py-3 hover:bg-ap-bg transition-colors">
+
+                  {/* Logo / icon */}
+                  <div className="w-9 flex-shrink-0">
+                    {market.market_logo ? (
+                      <img src={market.market_logo} alt={market.market_name} className="w-9 h-9 rounded-full object-cover border border-ap-border" />
+                    ) : (
+                      <span className="text-[26px]">{market.market_icon || "🎯"}</span>
+                    )}
+                  </div>
+
+                  {/* Name + times */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-ap-primary truncate">{market.market_name}</p>
+                    <div className="flex flex-wrap gap-x-3 mt-0.5">
+                      <span className="text-[11px] text-ap-secondary"><span className="text-ap-red">⊗</span> ปิดรับ {closeTime}</span>
+                      <span className="text-[11px] text-ap-secondary"><span className="text-ap-green">⊙</span> ผลออก {resultTime}</span>
+                    </div>
+                  </div>
+
+                  {/* Result / link */}
+                  <div className="flex-shrink-0 flex justify-end">
+                    {hasResult ? (
+                      <a
+                        href={`/${lang}/category/${activeGroup.group_code}`}
+                        className="flex items-center gap-1.5 bg-teal-500 text-white text-[12px] font-bold px-3 py-1.5 rounded-full hover:bg-teal-600 transition-colors tabular-nums"
+                      >
+                        {draw.result_top_3}
+                        <span className="opacity-60">·</span>
+                        {draw.result_bottom_2}
+                      </a>
+                    ) : (
+                      <a
+                        href={`/${lang}/category/${activeGroup.group_code}`}
+                        className="flex items-center gap-1 text-[12px] font-semibold text-ap-blue bg-ap-blue/10 px-3 py-1.5 rounded-full hover:bg-ap-blue hover:text-white transition-all"
+                      >
+                        ดูผล
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M9 18l6-6-6-6" strokeLinecap="round" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
         </div>
-      </div>
+      )}
+
     </div>
   );
 }
