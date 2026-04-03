@@ -27,7 +27,7 @@ export default function BetTypeSelector({ betType, onChange, visibleIds, disable
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-card border border-ap-border">
-      <div className="px-4 py-2.5 bg-gradient-to-r from-sky-700 to-indigo-700 border-b border-ap-border">
+      <div className="px-4 py-2.5 bg-gradient-to-r from-ap-blue to-sky-400 border-b border-ap-border">
         <p className="text-[12px] font-semibold text-white uppercase tracking-wider">{t.betTypeTitle}</p>
       </div>
       <div className="grid grid-cols-3 gap-2 p-4">

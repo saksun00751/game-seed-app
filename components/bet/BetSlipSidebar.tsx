@@ -169,14 +169,14 @@ export default function BetSlipSidebar({
       <div className="bg-white rounded-2xl overflow-hidden shadow-card border border-ap-border sticky top-4">
 
         {/* Header */}
-        <div className="px-4 py-3 border-b border-ap-border bg-gradient-to-r from-violet-700 to-fuchsia-700">
+        <div className="px-4 py-3 border-b border-ap-border bg-gradient-to-r from-ap-blue to-sky-400">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-[18px]">📋</span>
               <span className="text-[15px] font-bold text-white">{t.slipTitle}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-bold text-violet-700 bg-white px-2.5 py-0.5 rounded-full">
+              <span className="text-[12px] font-bold text-ap-blue bg-white px-2.5 py-0.5 rounded-full">
                 {bills.length} {t.items}
               </span>
               {bills.length > 0 && (

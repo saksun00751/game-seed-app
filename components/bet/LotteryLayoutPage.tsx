@@ -147,7 +147,7 @@ export default function LotteryLayoutPage({
               if (!visible.length || isClassic) return null;
               return (
                 <div className="bg-white rounded-2xl border border-ap-border shadow-card overflow-hidden">
-                  <div className="px-4 py-2.5 bg-gradient-to-r from-fuchsia-700 to-pink-700 border-b border-ap-border">
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-ap-blue to-sky-400 border-b border-ap-border">
                     <p className="text-[11px] text-white font-bold uppercase tracking-wide">{t.specialModeTitle}</p>
                   </div>
                   <div className="grid grid-cols-3 gap-2 p-3">
