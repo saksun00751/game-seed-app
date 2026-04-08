@@ -1,17 +1,16 @@
 "use client";
-import { useState } from "react";
 import { BetTypeId, BillRow, betTypeLabel } from "./types";
-import Toast from "@/components/ui/Toast";
 import { useLang } from "@/lib/i18n/context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
+import type { BettingContext } from "@/lib/types/bet";
 
 interface Props {
-  bills:       BillRow[];
-  lotteryName: string;
-  totalAmount: number;
-  onConfirm:   () => Promise<{ ok: boolean; error?: string; message?: string; response?: unknown }>;
-  onSuccess?:  () => void;
-  onCancel:    () => void;
+  bills:           BillRow[];
+  lotteryName:     string;
+  totalAmount:     number;
+  bettingContext?: BettingContext;
+  onConfirm:       () => void;
+  onCancel:        () => void;
 }
 
 function getAmountLabel(betType: BetTypeId, side: "top" | "bot", t: Record<string, string>): string {
@@ -40,8 +39,8 @@ export default function BetConfirmModal({
   bills,
   lotteryName,
   totalAmount,
+  bettingContext,
   onConfirm,
-  onSuccess,
   onCancel,
 }: Props) {
   const { lang } = useLang();
@@ -52,27 +51,9 @@ export default function BetConfirmModal({
     const key = `betType${id.charAt(0).toUpperCase()}${id.slice(1)}` as keyof typeof t;
     return (t[key] as string | undefined) ?? betTypeLabel(id);
   };
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
-  const [shaking, setShaking] = useState(false);
-
-  const handleConfirm = async () => {
-    setLoading(true);
-    setError("");
-    const result = await onConfirm();
-    if (result.ok) {
-      setSuccessMsg(result.message ?? t.saveSuccessDefault);
-      setTimeout(() => {
-        onSuccess?.();
-        onCancel();
-      }, 5300);
-    } else {
-      setError(result.message ?? result.error ?? t.errorUnknown);
-      setShaking(true);
-      setTimeout(() => setShaking(false), 450);
-      setLoading(false);
-    }
+  const handleConfirm = () => {
+    onConfirm();
+    onCancel();
   };
   const today = new Date().toLocaleDateString(numberLocale, {
     day: "2-digit", month: "2-digit", year: "numeric",
@@ -83,11 +64,11 @@ export default function BetConfirmModal({
     { key: "tod", label: t.tod },
   ];
 
-  // group by slipNo for display
-  const slipGroups = bills.reduce<Record<string, BillRow[]>>((acc, b) => {
-    (acc[b.slipNo] ??= []).push(b);
-    return acc;
-  }, {});
+  const groupedBills = (() => {
+    const base: Record<SlipGroupKey, BillRow[]> = { top: [], bottom: [], tod: [] };
+    for (const b of bills) base[getSlipGroupKey(b.betType)].push(b);
+    return base;
+  })();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -95,13 +76,13 @@ export default function BetConfirmModal({
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
 
       {/* Modal */}
-      <div className={`relative w-full max-w-md bg-white rounded-3xl shadow-card-xl overflow-hidden flex flex-col max-h-[90dvh] ${shaking ? "animate-shake" : ""}`}>
+      <div className={"relative w-full max-w-md bg-white rounded-3xl shadow-card-xl overflow-hidden flex flex-col max-h-[90dvh]"}>
 
         {/* Header */}
         <div className="px-5 py-4 border-b border-ap-border flex items-center justify-between shrink-0">
           <div>
             <p className="text-[16px] font-bold text-ap-primary">{t.confirmTitle}</p>
-            <p className="text-[12px] text-ap-secondary mt-0.5">{lotteryName} • {today}</p>
+            <p className="text-[13px] text-ap-primary font-medium mt-0.5">{lotteryName} • {today}</p>
           </div>
           <button onClick={onCancel}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-ap-bg hover:bg-ap-border text-ap-secondary transition-colors text-[18px]">
@@ -111,83 +92,92 @@ export default function BetConfirmModal({
 
         {/* Bill list */}
         <div className="overflow-y-auto flex-1">
-          {Object.entries(slipGroups).map(([slipNo, items]) => (
-            <div key={slipNo} className="border-b border-ap-border last:border-0">
-              <div className="px-5 py-2 bg-ap-bg/80">
-                <span className="text-[10px] font-bold text-ap-tertiary uppercase tracking-wide">
-                  {t.slipLabel} #{slipNo}
-                </span>
-              </div>
-              {groupMeta.map((group) => {
-                const grouped = items.filter((b) => getSlipGroupKey(b.betType) === group.key);
-                if (!grouped.length) return null;
-                return (
-                  <div key={`${slipNo}-${group.key}`} className="border-t border-ap-border">
-                    <div className="px-5 py-1.5 bg-ap-bg/60 flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-ap-secondary uppercase tracking-wide">{group.label}</span>
-                      <span className="text-[10px] text-ap-tertiary font-semibold">{grouped.length} {t.items}</span>
+          {groupMeta.map((group) => {
+            const items = groupedBills[group.key];
+            if (!items.length) return null;
+            return (
+              <div key={group.key} className="border-b border-ap-border last:border-0">
+                <div className="px-5 py-2 bg-ap-bg/80 flex items-center justify-between">
+                  <span className="text-[12px] font-bold text-ap-primary uppercase tracking-wide">{group.label}</span>
+                  <span className="text-[12px] font-bold text-ap-secondary">{items.length} {t.items}</span>
+                </div>
+                {items.map((b) => {
+                  const amt = b.top + b.bot;
+                  return (
+                    <div key={b.id} className="px-5 py-2.5 flex items-center gap-3 border-t border-ap-border first:border-t-0">
+                      <div className="w-10 h-10 rounded-xl bg-ap-primary flex items-center justify-center shrink-0">
+                        <span className="text-white font-extrabold text-[13px] tabular-nums">{b.number}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[11px] font-bold text-violet-600 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full">
+                          {getBetTypeLabel(b.betType)}
+                        </span>
+                        <p className="mt-0.5 text-[13px] font-bold tabular-nums text-ap-blue">
+                          <span className="font-semibold text-[11px]">{getAmountLabel(b.betType, "top", t as Record<string, string>)} </span>
+                          {amt}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[14px] font-bold text-ap-primary tabular-nums">฿{amt.toLocaleString(numberLocale)}</p>
+                      </div>
                     </div>
-                    {grouped.map((b) => {
-                      const amt = b.top + b.bot;
-                      return (
-                        <div key={b.id} className="px-5 py-2.5 flex items-center gap-3 border-t border-ap-border first:border-t-0">
-                          <div className="w-10 h-10 rounded-xl bg-ap-primary flex items-center justify-center shrink-0">
-                            <span className="text-white font-extrabold text-[13px] tabular-nums">{b.number}</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-[10px] font-bold text-violet-600 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full">
-                              {getBetTypeLabel(b.betType)}
-                            </span>
-                            <p className="mt-0.5 text-[12px] font-bold tabular-nums text-ap-blue">
-                              <span className="font-semibold text-[10px]">{getAmountLabel(b.betType, "top", t as Record<string, string>)} </span>
-                              {amt}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-[13px] font-bold text-ap-primary tabular-nums">฿{amt.toLocaleString(numberLocale)}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-              {items[0]?.note && (
-                <p className="px-5 pb-2 text-[11px] text-ap-secondary">
-                  {t.note}: {items[0].note}
-                </p>
-              )}
-            </div>
-          ))}
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
 
         {/* Summary */}
-        <div className="shrink-0 border-t border-ap-border bg-ap-bg/70 px-5 py-3 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] text-ap-secondary">{t.totalItems}</span>
-            <span className="text-[12px] font-semibold text-ap-primary">{bills.length} {t.items}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] text-ap-secondary">{t.totalBet}</span>
-            <span className="text-[20px] font-bold text-ap-primary tabular-nums">
-              ฿{totalAmount.toLocaleString(numberLocale)}
-            </span>
-          </div>
-        </div>
-
-        {/* Toast */}
-        {successMsg && <Toast message={successMsg} type="success" durationMs={5000} onClose={() => setSuccessMsg("")} />}
-        {error      && <Toast message={error}      type="error"   durationMs={5000} onClose={() => setError("")}      />}
+        {(() => {
+          const subtotalAmount = totalAmount;
+          const discountAmount = bills.reduce((sum, b) => {
+            const ctxBetType = b.betType;
+            const discountPercent = Number(bettingContext?.[ctxBetType]?.discountPercent ?? 0);
+            const amt = b.top + b.bot;
+            return sum + (amt * (discountPercent > 0 ? discountPercent : 0)) / 100;
+          }, 0);
+          const discountPct = subtotalAmount > 0 ? (discountAmount / subtotalAmount) * 100 : 0;
+          const netAmount = Math.max(0, subtotalAmount - discountAmount);
+          return (
+            <div className="shrink-0 border-t border-ap-border bg-ap-bg/70 px-5 py-3 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-semibold text-ap-primary">{t.totalItems}</span>
+                <span className="text-[13px] font-bold text-ap-primary">{bills.length} {t.items}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[14px] font-semibold text-ap-primary">ยอดก่อนหักส่วนลด</span>
+                <span className="text-[18px] font-bold text-ap-primary tabular-nums">
+                  ฿{subtotalAmount.toLocaleString(numberLocale)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-semibold text-ap-primary">
+                  ส่วนลด ({discountPct.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}%)
+                </span>
+                <span className="text-[14px] font-bold text-ap-green tabular-nums">
+                  -฿{discountAmount.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-1.5 border-t border-ap-border">
+                <span className="text-[15px] font-bold text-ap-primary">ยอดหลังหักส่วนลด</span>
+                <span className="text-[20px] font-bold text-ap-primary tabular-nums">
+                  ฿{netAmount.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Actions */}
         <div className="shrink-0 px-5 pb-5 pt-3 flex gap-3">
-          <button onClick={onCancel} disabled={loading}
-            className="flex-1 py-3 rounded-2xl border-2 border-ap-border text-[14px] font-bold text-ap-secondary hover:bg-ap-bg active:scale-[0.98] transition-all disabled:opacity-50">
+          <button onClick={onCancel}
+            className="flex-1 py-3 rounded-2xl border-2 border-ap-border text-[14px] font-bold text-ap-secondary hover:bg-ap-bg active:scale-[0.98] transition-all">
             {t.cancel}
           </button>
-          <button onClick={handleConfirm} disabled={loading}
-            className="flex-[2] py-3 rounded-2xl bg-ap-blue hover:bg-ap-blue-h text-white text-[14px] font-bold active:scale-[0.98] transition-all shadow-md disabled:opacity-70">
-            {loading ? t.saving : t.save}
+          <button onClick={handleConfirm}
+            className="flex-[2] py-3 rounded-2xl bg-ap-blue hover:bg-ap-blue-h text-white text-[14px] font-bold active:scale-[0.98] transition-all shadow-md">
+            {t.save}
           </button>
         </div>
 

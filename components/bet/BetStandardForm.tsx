@@ -246,7 +246,7 @@ export default function BetStandardForm({ betType, baseBetType, selected3, selec
               </div>
             ))}
           </div>
-          <p className="text-center text-[11px] text-ap-tertiary">
+          <p className="text-center text-[12px] text-ap-secondary font-medium">
             {t.inputNumberLabel?.replace("{digits}", String(maxDigits)) ?? `ใส่เลข (${maxDigits} หลัก)`}
           </p>
         </div>
@@ -292,8 +292,8 @@ export default function BetStandardForm({ betType, baseBetType, selected3, selec
         <div className="rounded-2xl border border-ap-border bg-white mb-4 overflow-hidden">
           <div className="px-4 py-2 flex items-center justify-between border-b border-ap-border bg-ap-bg/80">
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-semibold text-ap-secondary uppercase tracking-wide">{t.previewTitle}</span>
-              <span className="text-[12px] font-bold text-ap-primary tabular-nums">{preview.length} {t.countUnit}</span>
+              <span className="text-[13px] font-bold text-ap-primary uppercase tracking-wide">{t.previewTitle}</span>
+              <span className="text-[13px] font-bold text-ap-blue tabular-nums">{preview.length} {t.countUnit}</span>
             </div>
             {preview.length > 0 && (
               <button
@@ -306,7 +306,7 @@ export default function BetStandardForm({ betType, baseBetType, selected3, selec
           </div>
           <div className="p-3 min-h-[52px] flex flex-wrap gap-1.5">
             {preview.length === 0 ? (
-              <span className="text-[13px] text-ap-tertiary self-center">— {t.previewEmpty} —</span>
+              <span className="text-[13px] text-ap-secondary font-medium self-center">— {t.previewEmpty} —</span>
             ) : (
               preview.map((n, idx) => (
                 <span
@@ -331,7 +331,7 @@ export default function BetStandardForm({ betType, baseBetType, selected3, selec
           <div className="grid grid-cols-2 gap-2 mb-3">
             {/* บน */}
             <div>
-              <label className={`text-[11px] font-bold mb-1 flex items-center gap-1 uppercase tracking-wide ${showTop ? "text-ap-secondary" : "text-ap-tertiary"}`}>
+              <label className={`text-[12px] font-bold mb-1 flex items-center gap-1 uppercase tracking-wide ${showTop ? "text-ap-primary" : "text-ap-tertiary"}`}>
                 {t.top}
                 {showTop && topCtx?.payout ? <span className="text-ap-green font-bold normal-case">×{topCtx.payout}</span> : null}
               </label>
@@ -346,7 +346,7 @@ export default function BetStandardForm({ betType, baseBetType, selected3, selec
                 className="w-full border-2 border-ap-blue/30 rounded-xl px-3 py-3 text-[16px] text-center font-extrabold text-ap-blue outline-none focus:border-ap-blue focus:ring-4 focus:ring-ap-blue/15 bg-blue-50/40 shadow-sm transition-all disabled:bg-ap-bg disabled:text-ap-tertiary disabled:cursor-not-allowed disabled:border-ap-border disabled:shadow-none"
               />
               {showTop && topCtx && (
-                <p className="mt-0.5 text-[10px] text-ap-tertiary text-center">
+                <p className="mt-0.5 text-[11px] text-ap-secondary font-medium text-center">
                   {topCtx.minBet}–{topCtx.maxBet.toLocaleString()}
                   {topCtx.maxPerNumber ? ` • /เลข ≤${topCtx.maxPerNumber.toLocaleString()}` : ""}
                 </p>
@@ -355,7 +355,7 @@ export default function BetStandardForm({ betType, baseBetType, selected3, selec
 
             {/* ล่าง / โต๊ด */}
             <div>
-              <label className={`text-[11px] font-bold mb-1 flex items-center gap-1 uppercase tracking-wide ${showBot ? "text-ap-secondary" : "text-ap-tertiary"}`}>
+              <label className={`text-[12px] font-bold mb-1 flex items-center gap-1 uppercase tracking-wide ${showBot ? "text-ap-primary" : "text-ap-tertiary"}`}>
                 {bottomAmountLabel}
                 {showBot && botCtx?.payout ? <span className="text-ap-green font-bold normal-case">×{botCtx.payout}</span> : null}
               </label>
@@ -370,7 +370,7 @@ export default function BetStandardForm({ betType, baseBetType, selected3, selec
                 className="w-full border-2 border-green-400/40 rounded-xl px-3 py-3 text-[16px] text-center font-extrabold text-ap-green outline-none focus:border-ap-green focus:ring-4 focus:ring-green-500/15 bg-green-50/40 shadow-sm transition-all disabled:bg-ap-bg disabled:text-ap-tertiary disabled:cursor-not-allowed disabled:border-ap-border disabled:shadow-none"
               />
               {showBot && botCtx && (
-                <p className="mt-0.5 text-[10px] text-ap-tertiary text-center">
+                <p className="mt-0.5 text-[11px] text-ap-secondary font-medium text-center">
                   {botCtx.minBet}–{botCtx.maxBet.toLocaleString()}
                   {botCtx.maxPerNumber ? ` • /เลข ≤${botCtx.maxPerNumber.toLocaleString()}` : ""}
                 </p>

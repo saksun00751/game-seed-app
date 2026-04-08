@@ -73,7 +73,7 @@ export default function BetTypeSelector({ betType, onChange, selected3, selected
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-card border border-ap-border">
       <div className="px-4 py-2.5 bg-gradient-to-r from-ap-blue to-sky-400 border-b border-ap-border">
-        <p className="text-[12px] font-semibold text-white uppercase tracking-wider">{t.betTypeTitle}</p>
+        <p className="text-[13px] font-bold text-white uppercase tracking-wider">{t.betTypeTitle}</p>
       </div>
       <div className="p-3 space-y-2">
         {visibleGroups.map((group) => {

@@ -119,8 +119,6 @@ function getSlipGroupKey(betType: BetTypeId): SlipGroupKey {
 
 export default function BetSlipSidebar({
   bills,
-  drawId,
-  packageId,
   bettingContext,
   lotteryName,
   lotteryFlag,
@@ -140,8 +138,10 @@ export default function BetSlipSidebar({
     const key = `betType${id.charAt(0).toUpperCase()}${id.slice(1)}` as keyof typeof t;
     return (t[key] as string | undefined) ?? betTypeLabel(id);
   };
-  const [showModal,  setShowModal]  = useState(false);
-  const [closedToast, setClosedToast] = useState(false);
+  const [showModal,    setShowModal]    = useState(false);
+  const [closedToast,  setClosedToast]  = useState(false);
+  const [saving,       setSaving]       = useState(false);
+  const [resultToast,  setResultToast]  = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const groupedBills = (() => {
     const base: Record<SlipGroupKey, BillRow[]> = { top: [], bottom: [], tod: [] };
     for (const b of [...bills].reverse()) {
@@ -172,8 +172,19 @@ export default function BetSlipSidebar({
     setShowModal(true);
   }
 
-  const handleConfirm = async () => {
-    return onConfirm();
+  const handleConfirmAndClose = async () => {
+    setShowModal(false);
+    setSaving(true);
+    // แสดง loading 2 วิก่อน แล้วค่อย post
+    await new Promise((r) => setTimeout(r, 2000));
+    const result = await onConfirm();
+    setSaving(false);
+    if (result.ok) {
+      setResultToast({ msg: result.message ?? t.saveSuccessDefault, type: "success" });
+      onConfirmSuccess?.();
+    } else {
+      setResultToast({ msg: result.message ?? result.error ?? t.errorUnknown, type: "error" });
+    }
   };
   return (
     <>
@@ -182,8 +193,8 @@ export default function BetSlipSidebar({
         bills={bills}
         lotteryName={lotteryName}
         totalAmount={totalAmount}
-        onConfirm={handleConfirm}
-        onSuccess={onConfirmSuccess}
+        bettingContext={bettingContext}
+        onConfirm={handleConfirmAndClose}
         onCancel={() => setShowModal(false)}
       />
     )}
@@ -213,7 +224,7 @@ export default function BetSlipSidebar({
               ? <img src={lotteryLogo} alt={lotteryName} className="w-4 h-4 rounded-full object-cover shrink-0" />
               : lotteryFlag ? <span className="text-[13px] shrink-0">{lotteryFlag}</span> : null
             }
-            <span className="text-[13px] text-ap-secondary font-medium">{lotteryName}</span>
+            <span className="text-[13px] text-ap-primary font-semibold">{lotteryName}</span>
           </div>
         </div>
 
@@ -221,8 +232,8 @@ export default function BetSlipSidebar({
         {bills.length === 0 ? (
           <div className="py-14 flex flex-col items-center gap-2">
             <span className="text-[48px]">📋</span>
-            <p className="text-[13px] font-semibold text-ap-primary">{t.noItems}</p>
-            <p className="text-[12px] text-ap-secondary">{t.enterAndAdd}</p>
+            <p className="text-[14px] font-bold text-ap-primary">{t.noItems}</p>
+            <p className="text-[13px] text-ap-secondary font-medium">{t.enterAndAdd}</p>
           </div>
         ) : (
           <div className="divide-y divide-ap-border max-h-[480px] overflow-y-auto">
@@ -232,8 +243,8 @@ export default function BetSlipSidebar({
               return (
                 <div key={group.key}>
                   <div className="px-4 py-2 bg-ap-bg/80 border-b border-ap-border flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-ap-secondary uppercase tracking-wide">{group.label}</span>
-                    <span className="text-[11px] font-semibold text-ap-tertiary">{items.length} {t.items}</span>
+                    <span className="text-[12px] font-bold text-ap-primary uppercase tracking-wide">{group.label}</span>
+                    <span className="text-[12px] font-bold text-ap-secondary">{items.length} {t.items}</span>
                   </div>
                   {items.map((b) => {
                     const amt = b.top + b.bot;
@@ -256,7 +267,7 @@ export default function BetSlipSidebar({
                             className="text-[10px] text-ap-red hover:underline mb-1.5">
                             {t.delete}
                           </button>
-                          <p className="text-[10px] text-ap-tertiary">{t.totalBet}</p>
+                          <p className="text-[11px] text-ap-secondary font-medium">{t.totalBet}</p>
                           <p className="text-[13px] font-bold text-ap-primary tabular-nums">
                             ฿{amt.toLocaleString(numberLocale)}
                           </p>
@@ -275,17 +286,17 @@ export default function BetSlipSidebar({
           <div className="border-t border-ap-border">
             <div className="px-4 py-3 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[12px] text-ap-secondary">{t.totalItems}</span>
-                <span className="text-[12px] font-semibold text-ap-primary">{bills.length} {t.items}</span>
+                <span className="text-[12px] font-semibold text-ap-primary">{t.totalItems}</span>
+                <span className="text-[12px] font-bold text-ap-primary">{bills.length} {t.items}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[16px] text-ap-secondary">ยอดก่อนหักส่วนลด</span>
+                <span className="text-[16px] font-semibold text-ap-primary">ยอดก่อนหักส่วนลด</span>
                 <span className="text-[22px] font-bold text-ap-primary tabular-nums">
                   ฿{subtotalAmount.toLocaleString(numberLocale)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[14px] text-ap-secondary">
+                <span className="text-[14px] font-semibold text-ap-primary">
                   ส่วนลด ({discountPct.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}%)
                 </span>
                 <span className="text-[14px] font-bold text-ap-green tabular-nums">
@@ -293,13 +304,13 @@ export default function BetSlipSidebar({
                 </span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-ap-border">
-                <span className="text-[16px] text-ap-secondary">ยอดหลังหักส่วนลด</span>
+                <span className="text-[16px] font-bold text-ap-primary">ยอดหลังหักส่วนลด</span>
                 <span className="text-[22px] font-bold text-ap-primary tabular-nums">
                   ฿{netAmount.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-ap-border">
-                <span className="text-[16px] text-ap-red font-semibold">⏱ {t.closeIn}</span>
+                <span className="text-[16px] text-ap-red font-bold">⏱ {t.closeIn}</span>
                 {closeAt
                   ? <CountdownTimer closeAt={closeAt} className="text-[16px] font-bold text-ap-red tabular-nums" />
                   : <span className="text-[16px] font-bold text-ap-red tabular-nums">—</span>
@@ -312,19 +323,40 @@ export default function BetSlipSidebar({
                 {t.confirmBet}
               </button>
             </div>
-            {/* JSON โพยหวย */}
-            <div className="px-4 pb-4">
-              <p className="text-[11px] font-bold text-ap-secondary uppercase tracking-wide mb-1.5">JSON โพยหวย</p>
-              <pre className="bg-gray-900 text-green-400 text-[11px] p-3 rounded-xl overflow-auto max-h-[300px] leading-relaxed">
-                {JSON.stringify({ draw_id: drawId, package_id: packageId ?? null, items: payloadItems }, null, 2)}
-              </pre>
-            </div>
           </div>
         )}
 
       </div>
 
     </div>
+
+    {/* Loading overlay — full screen */}
+    {saving && (
+      <div className="fixed inset-0 z-50 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 rounded-full border-4 border-ap-blue/20" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-ap-blue animate-spin" />
+        </div>
+        <div className="text-center">
+          <p className="text-[15px] font-bold text-ap-primary">{t.saving ?? "กำลังบันทึก..."}</p>
+          <p className="text-[12px] text-ap-secondary font-medium mt-1">{(t as Record<string,string>).pleaseWait ?? "กรุณารอสักครู่"}</p>
+        </div>
+        <div className="flex gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-ap-blue animate-bounce" style={{ animationDelay: "0ms" }} />
+          <span className="w-2 h-2 rounded-full bg-ap-blue animate-bounce" style={{ animationDelay: "150ms" }} />
+          <span className="w-2 h-2 rounded-full bg-ap-blue animate-bounce" style={{ animationDelay: "300ms" }} />
+        </div>
+      </div>
+    )}
+
+    {resultToast && (
+      <Toast
+        message={resultToast.msg}
+        type={resultToast.type}
+        durationMs={4000}
+        onClose={() => setResultToast(null)}
+      />
+    )}
 
     {closedToast && (
       <Toast
