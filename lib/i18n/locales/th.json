@@ -141,6 +141,7 @@
     "live": "Live",
     "emptyDescription": "-",
     "betTypeTitle": "ประเภทการแทง",
+    "tabStandard": "แทงมาตรฐาน",
     "tabQuick": "แทงเร็ว",
     "tabClassic": "แทงแบบคลาสสิค",
     "tabSlip": "วางโพย",
@@ -221,6 +222,8 @@
     "betType2bot": "2 ตัวล่าง",
     "betTypeRun": "วิ่งบน",
     "betTypeWinlay": "วิ่งล่าง",
+    "betType2perm": "2กลับ",
+    "betType3perm": "3กลับ",
     "betType6perm": "6กลับ",
     "betType19door": "19ประตู",
     "betTypeWinnum": "วินเลข"

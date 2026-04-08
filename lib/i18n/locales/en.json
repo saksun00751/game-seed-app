@@ -141,6 +141,7 @@
     "live": "Live",
     "emptyDescription": "-",
     "betTypeTitle": "Bet Type",
+    "tabStandard": "Standard",
     "tabQuick": "Quick Bet",
     "tabClassic": "Classic Bet",
     "tabSlip": "Paste Slip",
@@ -221,6 +222,8 @@
     "betType2bot": "2 Digits Bottom",
     "betTypeRun": "Run Top",
     "betTypeWinlay": "Run Bottom",
+    "betType2perm": "2 Reverse",
+    "betType3perm": "3 Reverse",
     "betType6perm": "6 Reverse",
     "betType19door": "19 Doors",
     "betTypeWinnum": "Win Number"

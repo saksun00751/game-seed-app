@@ -109,6 +109,14 @@ function getAmountLabel(betType: BetTypeId, side: "top" | "bot", t: Record<strin
   return t.betTypeWinlay;
 }
 
+type SlipGroupKey = "top" | "bottom" | "tod";
+
+function getSlipGroupKey(betType: BetTypeId): SlipGroupKey {
+  if (betType === "3tod") return "tod";
+  if (betType === "2bot" || betType === "winlay") return "bottom";
+  return "top";
+}
+
 export default function BetSlipSidebar({
   bills,
   drawId,
@@ -134,6 +142,18 @@ export default function BetSlipSidebar({
   };
   const [showModal,  setShowModal]  = useState(false);
   const [closedToast, setClosedToast] = useState(false);
+  const groupedBills = (() => {
+    const base: Record<SlipGroupKey, BillRow[]> = { top: [], bottom: [], tod: [] };
+    for (const b of [...bills].reverse()) {
+      base[getSlipGroupKey(b.betType)].push(b);
+    }
+    return base;
+  })();
+  const groupMeta: { key: SlipGroupKey; label: string }[] = [
+    { key: "top", label: t.top },
+    { key: "bottom", label: t.bottom },
+    { key: "tod", label: t.tod },
+  ];
   const payloadItems = mapBillsToItems(bills);
   const subtotalAmount = payloadItems.reduce((sum, item) => sum + item.amount, 0);
   const discountAmount = payloadItems.reduce((sum, item) => {
@@ -206,47 +226,44 @@ export default function BetSlipSidebar({
           </div>
         ) : (
           <div className="divide-y divide-ap-border max-h-[480px] overflow-y-auto">
-            {[...bills].reverse().map((b) => {
-              const amt    = b.top + b.bot;
-              const amountRows = [
-                b.top > 0 ? { side: "top" as const, amount: b.top } : null,
-                b.bot > 0 ? { side: "bot" as const, amount: b.bot } : null,
-              ].filter(Boolean) as { side: "top" | "bot"; amount: number }[];
+            {groupMeta.map((group) => {
+              const items = groupedBills[group.key];
+              if (!items.length) return null;
               return (
-                <div key={b.id} className="px-4 py-3 flex items-center gap-3 hover:bg-ap-bg/40 transition-colors">
-                  {/* Number box */}
-                  <div className="w-12 h-12 rounded-2xl bg-ap-primary flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-extrabold text-[15px] tabular-nums tracking-wider">{b.number}</span>
+                <div key={group.key}>
+                  <div className="px-4 py-2 bg-ap-bg/80 border-b border-ap-border flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-ap-secondary uppercase tracking-wide">{group.label}</span>
+                    <span className="text-[11px] font-semibold text-ap-tertiary">{items.length} {t.items}</span>
                   </div>
-
-                  {/* Middle */}
-                  <div className="flex-1 min-w-0">
-                    <span className="inline-block text-[11px] font-bold text-violet-600 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full mb-1.5">
-                      {getBetTypeLabel(b.betType)}
-                    </span>
-                    <div className="space-y-0.5">
-                      {amountRows.map((row, idx) => (
-                        <p key={`${b.id}-${row.side}-${idx}`} className="text-[13px] font-bold tabular-nums">
-                          <span className={row.side === "top" ? "text-ap-blue" : "text-ap-green"}>
-                            <span className="text-[11px] font-semibold">{getAmountLabel(b.betType, row.side, t as Record<string, string>)} </span>
-                            {row.amount}
+                  {items.map((b) => {
+                    const amt = b.top + b.bot;
+                    return (
+                      <div key={b.id} className="px-4 py-3 flex items-center gap-3 hover:bg-ap-bg/60 transition-colors border-b border-ap-border last:border-b-0">
+                        <div className="w-12 h-12 rounded-2xl bg-ap-primary flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-extrabold text-[15px] tabular-nums tracking-wider">{b.number}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="inline-block text-[11px] font-bold text-violet-600 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full mb-1.5">
+                            {getBetTypeLabel(b.betType)}
                           </span>
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Right: ลบ + ยอดแทง */}
-                  <div className="text-right flex-shrink-0 flex flex-col items-end">
-                    <button onClick={() => onDelete(b.id)}
-                      className="text-[10px] text-ap-red hover:underline mb-1.5">
-                      {t.delete}
-                    </button>
-                    <p className="text-[10px] text-ap-tertiary">{t.totalBet}</p>
-                    <p className="text-[13px] font-bold text-ap-primary tabular-nums">
-                      ฿{amt.toLocaleString(numberLocale)}
-                    </p>
-                  </div>
+                          <p className="text-[13px] font-bold tabular-nums text-ap-blue">
+                            <span className="text-[11px] font-semibold">{getAmountLabel(b.betType, "top", t as Record<string, string>)} </span>
+                            {amt}
+                          </p>
+                        </div>
+                        <div className="text-right flex-shrink-0 flex flex-col items-end">
+                          <button onClick={() => onDelete(b.id)}
+                            className="text-[10px] text-ap-red hover:underline mb-1.5">
+                            {t.delete}
+                          </button>
+                          <p className="text-[10px] text-ap-tertiary">{t.totalBet}</p>
+                          <p className="text-[13px] font-bold text-ap-primary tabular-nums">
+                            ฿{amt.toLocaleString(numberLocale)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
@@ -289,11 +306,18 @@ export default function BetSlipSidebar({
                 }
               </div>
             </div>
-            <div className="px-4 pb-4">
+            <div className="px-4 pb-4 space-y-2">
               <button onClick={handleOpenModal}
                 className="w-full bg-ap-blue hover:bg-ap-blue-h text-white font-bold text-[14px] py-3 rounded-2xl transition-colors active:scale-[0.98]">
                 {t.confirmBet}
               </button>
+            </div>
+            {/* JSON โพยหวย */}
+            <div className="px-4 pb-4">
+              <p className="text-[11px] font-bold text-ap-secondary uppercase tracking-wide mb-1.5">JSON โพยหวย</p>
+              <pre className="bg-gray-900 text-green-400 text-[11px] p-3 rounded-xl overflow-auto max-h-[300px] leading-relaxed">
+                {JSON.stringify({ draw_id: drawId, package_id: packageId ?? null, items: payloadItems }, null, 2)}
+              </pre>
             </div>
           </div>
         )}

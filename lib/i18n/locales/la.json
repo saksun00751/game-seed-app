@@ -141,6 +141,7 @@
     "live": "Live",
     "emptyDescription": "-",
     "betTypeTitle": "ປະເພດການແທງ",
+    "tabStandard": "ແທງມາດຕະຖານ",
     "tabQuick": "ແທງໄວ",
     "tabClassic": "ແທງຄລາສສິກ",
     "tabSlip": "ວາງໂພຍ",
@@ -221,6 +222,8 @@
     "betType2bot": "2 ຕົວລຸ່ມ",
     "betTypeRun": "ວິ່ງເທິງ",
     "betTypeWinlay": "ວິ່ງລຸ່ມ",
+    "betType2perm": "2ກັບ",
+    "betType3perm": "3ກັບ",
     "betType6perm": "6ກັບ",
     "betType19door": "19ປະຕູ",
     "betTypeWinnum": "ວິນເລກ"

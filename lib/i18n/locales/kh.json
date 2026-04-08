@@ -141,6 +141,7 @@
     "live": "Live",
     "emptyDescription": "-",
     "betTypeTitle": "ប្រភេទភ្នាល់",
+    "tabStandard": "ភ្នាល់ស្តង់ដារ",
     "tabQuick": "ភ្នាល់លឿន",
     "tabClassic": "ភ្នាល់ក្លាស៊ិក",
     "tabSlip": "បិទភ្ជាប់បង្កាន់ដៃ",
@@ -221,6 +222,8 @@
     "betType2bot": "2 ខ្ទង់ក្រោម",
     "betTypeRun": "រត់លើ",
     "betTypeWinlay": "រត់ក្រោម",
+    "betType2perm": "2 បញ្ច្រាស",
+    "betType3perm": "3 បញ្ច្រាស",
     "betType6perm": "6 បញ្ច្រាស",
     "betType19door": "19 ទ្វារ",
     "betTypeWinnum": "Win Number"

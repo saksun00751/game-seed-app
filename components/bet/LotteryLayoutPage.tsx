@@ -43,6 +43,9 @@ export default function LotteryLayoutPage({
   const t = getTranslation(lang, "bet");
   const [bills,       setBills]       = useState<BillRow[]>([]);
   const [betType,     setBetType]     = useState<BetTypeId>("3top");
+  const [selected3,   setSelected3]   = useState<BetTypeId[]>(["3top"]);
+  const [selected2,   setSelected2]   = useState<BetTypeId[]>(["2top"]);
+  const [selectedRun, setSelectedRun] = useState<BetTypeId[]>(["run"]);
   const [specialMode, setSpecialMode] = useState<BetTypeId | null>(null);
   const [isClassic,   setIsClassic]   = useState(false);
 
@@ -53,7 +56,7 @@ export default function LotteryLayoutPage({
     if (!enrichedIds.includes("run"))    enrichedIds.push("run");
     if (!enrichedIds.includes("winlay")) enrichedIds.push("winlay");
   }
-  const specialTypes: BetTypeId[] = ["6perm", "19door", "winnum"];
+  const specialTypes: BetTypeId[] = ["2perm", "3perm", "6perm", "19door", "winnum"];
   const selectorTypeIds = enrichedIds.length
     ? enrichedIds.filter((id) => !specialTypes.includes(id))
     : BET_TYPE_BTNS.map((b) => b.id).filter((id) => !specialTypes.includes(id));
@@ -76,7 +79,32 @@ export default function LotteryLayoutPage({
 
   const changeBetType = (id: BetTypeId) => {
     setBetType(id);
-    setSpecialMode(null); // reset โหมดพิเศษเมื่อเปลี่ยนประเภทปกติ
+    setSpecialMode(null);
+    // reset selected3 เมื่อเข้ากลุ่ม 3 ตัว
+    if (id === "3top" || id === "3tod") setSelected3(["3top"]);
+    if (id === "2top" || id === "2bot") setSelected2(["2top"]);
+    if (id === "run" || id === "winlay") setSelectedRun(["run"]);
+  };
+  const toggle3Type = (id: BetTypeId) => {
+    setSelected3((prev) => {
+      const has = prev.includes(id);
+      if (has && prev.length <= 1) return prev; // ห้ามปิดทั้งคู่
+      return has ? prev.filter((x) => x !== id) : [...prev, id];
+    });
+  };
+  const toggle2Type = (id: BetTypeId) => {
+    setSelected2((prev) => {
+      const has = prev.includes(id);
+      if (has && prev.length <= 1) return prev; // ห้ามปิดทั้งคู่
+      return has ? prev.filter((x) => x !== id) : [...prev, id];
+    });
+  };
+  const toggleRunType = (id: BetTypeId) => {
+    setSelectedRun((prev) => {
+      const has = prev.includes(id);
+      if (has && prev.length <= 1) return prev; // ห้ามปิดทั้งคู่
+      return has ? prev.filter((x) => x !== id) : [...prev, id];
+    });
   };
   const changeSpecialMode = (id: BetTypeId) => {
     setSpecialMode((prev) => (prev === id ? null : id)); // toggle
@@ -130,16 +158,20 @@ export default function LotteryLayoutPage({
 
           {/* Main column */}
           <div className="space-y-3">
-            <BetTypeSelector betType={betType} onChange={changeBetType} visibleIds={selectorTypeIds} disabled={isClassic} bettingContext={bettingContext} />
+            <BetTypeSelector betType={betType} onChange={changeBetType} selected3={selected3} selected2={selected2} selectedRun={selectedRun} onToggle3={toggle3Type} onToggle2={toggle2Type} onToggleRun={toggleRunType} visibleIds={selectorTypeIds} disabled={isClassic} bettingContext={bettingContext} />
 
             {/* โหมดพิเศษ */}
             {(() => {
               const specialModes: { id: BetTypeId; label: string }[] = [
+                { id: "2perm",  label: t.betType2perm },
+                { id: "3perm",  label: t.betType3perm },
                 { id: "6perm",  label: t.betType6perm },
                 { id: "19door", label: t.betType19door },
                 { id: "winnum", label: t.betTypeWinnum },
               ];
               const visible = specialModes.filter((m) => {
+                if (m.id === "2perm")  return betType === "2top" || betType === "2bot";
+                if (m.id === "3perm")  return betType === "3top" || betType === "3tod";
                 if (m.id === "6perm")  return betType === "3top" || betType === "3tod";
                 if (m.id === "19door") return betType === "2top" || betType === "2bot";
                 if (m.id === "winnum") return betType === "2top" || betType === "2bot";
@@ -178,7 +210,9 @@ export default function LotteryLayoutPage({
             <BetQuickForm
               betType={effectiveBetType}
               baseBetType={betType}
-              onBetTypeChange={changeBetType}
+              selected3={selected3}
+              selected2={selected2}
+              selectedRun={selectedRun}
               lotteryName={lotteryName}
               lotteryFlag={lotteryFlag}
               lotteryLogo={lotteryLogo}

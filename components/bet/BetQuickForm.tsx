@@ -1,7 +1,8 @@
 "use client";
 import { useState, useCallback, useEffect } from "react";
 import Toast from "@/components/ui/Toast";
-import BetClassicForm from "./BetClassicForm";
+import BetClassicForm  from "./BetClassicForm";
+import BetStandardForm from "./BetStandardForm";
 import { useLang } from "@/lib/i18n/context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import {
@@ -11,9 +12,14 @@ import {
 } from "./types";
 import type { NumberLimitRow, BettingContext } from "@/lib/types/bet";
 
+const SPECIAL_FUNCTION_TYPES = ["2perm", "3perm", "6perm", "19door", "winnum"] as const;
+type SpecialFunctionType = (typeof SPECIAL_FUNCTION_TYPES)[number];
+const isSpecialFunctionType = (id: BetTypeId): id is SpecialFunctionType =>
+  (SPECIAL_FUNCTION_TYPES as readonly string[]).includes(id);
+
 const DB_BET_TYPE: Record<BetTypeId, string> = {
   "3top": "top3", "3tod": "tod3", "2top": "top2", "2bot": "bot2",
-  "run": "run_top", "winlay": "run_bot", "6perm": "top3", "19door": "top2", "winnum": "top2",
+  "run": "run_top", "winlay": "run_bot", "2perm": "top2", "3perm": "top3", "6perm": "top3", "19door": "top2", "winnum": "top2",
 };
 
 function isBlocked(number: string, betType: BetTypeId, limits: NumberLimitRow[]): boolean {
@@ -25,15 +31,17 @@ function isBlocked(number: string, betType: BetTypeId, limits: NumberLimitRow[])
 
 // bet type ที่ตรงกับ input ล่าง/โต๊ด ของแต่ละ bet type
 const BOT_BET_TYPE: Partial<Record<BetTypeId, BetTypeId>> = {
-  "3top": "3tod", "6perm": "3tod",
-  "2top": "2bot", "19door": "2bot", "winnum": "2bot",
+  "3top": "3tod", "3perm": "3tod", "6perm": "3tod",
+  "2top": "2bot", "2perm": "2bot", "19door": "2bot", "winnum": "2bot",
   "run": "winlay",
 };
 
 interface Props {
   betType:            BetTypeId;
   baseBetType?:       BetTypeId;
-  onBetTypeChange?:   (id: BetTypeId) => void;
+  selected3?:         BetTypeId[];
+  selected2?:         BetTypeId[];
+  selectedRun?:       BetTypeId[];
   lotteryName:        string;
   lotteryFlag?:       string;
   lotteryLogo?:       string;
@@ -50,7 +58,9 @@ interface Props {
 export default function BetQuickForm({
   betType,
   baseBetType,
-  onBetTypeChange,
+  selected3,
+  selected2,
+  selectedRun,
   lotteryName,
   lotteryFlag,
   lotteryLogo,
@@ -69,15 +79,21 @@ export default function BetQuickForm({
   const today = new Date().toLocaleDateString(dateLocale, { day: "2-digit", month: "2-digit", year: "numeric" });
 
   const maxDigits = MAX_DIGITS[betType];
+  const pairingType: BetTypeId = (() => {
+    if (isSpecialFunctionType(betType) && baseBetType) return baseBetType;
+    if (betType === "3perm" || betType === "6perm") return "3top";
+    if (betType === "2perm" || betType === "19door" || betType === "winnum") return "2top";
+    return betType;
+  })();
 
   // 3top/3tod → เปิดทั้ง บน(3top) และ โต๊ด(3tod) พร้อมกัน
   // 2top/2bot → เปิดทั้ง บน(2top) และ ล่าง(2bot) พร้อมกัน
-  const is3DigitPair = betType === "3top" || betType === "3tod";
-  const is2DigitPair = betType === "2top" || betType === "2bot";
-  const isRunPair    = betType === "run"  || betType === "winlay";
+  const is3DigitPair = pairingType === "3top" || pairingType === "3tod";
+  const is2DigitPair = pairingType === "2top" || pairingType === "2bot";
+  const isRunPair    = pairingType === "run"  || pairingType === "winlay";
 
-  const topBillType: BetTypeId = is3DigitPair ? "3top" : is2DigitPair ? "2top" : isRunPair ? "run"    : betType;
-  const botBillType: BetTypeId = is3DigitPair ? "3tod" : is2DigitPair ? "2bot" : isRunPair ? "winlay" : (BOT_BET_TYPE[betType] ?? betType);
+  const topBillType: BetTypeId = is3DigitPair ? "3top" : is2DigitPair ? "2top" : isRunPair ? "run"    : pairingType;
+  const botBillType: BetTypeId = is3DigitPair ? "3tod" : is2DigitPair ? "2bot" : isRunPair ? "winlay" : (BOT_BET_TYPE[pairingType] ?? pairingType);
 
   const topCtx = is3DigitPair
     ? bettingContext?.["3top"]
@@ -85,19 +101,31 @@ export default function BetQuickForm({
     ? bettingContext?.["2top"]
     : isRunPair
     ? bettingContext?.["run"]
-    : bettingContext?.[betType];
+    : bettingContext?.[topBillType];
   const botCtx = is3DigitPair
     ? bettingContext?.["3tod"]
     : is2DigitPair
     ? bettingContext?.["2bot"]
     : isRunPair
     ? bettingContext?.["winlay"]
-    : bettingContext?.[BOT_BET_TYPE[betType] ?? betType];
+    : bettingContext?.[botBillType];
 
-  const TOP_TYPES: BetTypeId[] = ["3top", "6perm", "2top", "19door", "winnum", "run"];
-  const BOT_TYPES: BetTypeId[] = ["6perm", "3tod", "19door", "winnum", "2bot", "winlay"];
-  const showTop = is3DigitPair || is2DigitPair || isRunPair || TOP_TYPES.includes(betType);
-  const showBot = is3DigitPair || is2DigitPair || isRunPair || BOT_TYPES.includes(betType);
+  const TOP_TYPES: BetTypeId[] = ["3top", "3perm", "6perm", "2top", "2perm", "19door", "winnum", "run"];
+  const BOT_TYPES: BetTypeId[] = ["3perm", "6perm", "3tod", "2perm", "19door", "winnum", "2bot", "winlay"];
+  const showTop = is3DigitPair
+    ? (selected3?.includes("3top") ?? true)
+    : is2DigitPair
+      ? (selected2?.includes("2top") ?? true)
+    : isRunPair
+      ? (selectedRun?.includes("run") ?? true)
+    : (is2DigitPair || isRunPair || TOP_TYPES.includes(betType));
+  const showBot = is3DigitPair
+    ? (selected3?.includes("3tod") ?? true)
+    : is2DigitPair
+      ? (selected2?.includes("2bot") ?? true)
+    : isRunPair
+      ? (selectedRun?.includes("winlay") ?? true)
+    : (is2DigitPair || isRunPair || BOT_TYPES.includes(betType));
 
   const bottomAmountLabel = (is3DigitPair || maxDigits === 3) ? t.tod : t.bottom;
 
@@ -114,6 +142,7 @@ export default function BetQuickForm({
   };
 
   const tabLabels: Record<TabId, string> = {
+    standard: t.tabStandard,
     quick: t.tabQuick,
     classic: t.tabClassic,
     slip: t.tabSlip,
@@ -136,8 +165,8 @@ export default function BetQuickForm({
 
     const valid = complete.filter((t) => t.length === maxDigits);
     if (valid.length > 0) {
-      const blockedNums = valid.filter((n) => isBlocked(n, betType, numberLimits));
-      const allowedNums = valid.filter((n) => !isBlocked(n, betType, numberLimits));
+      const blockedNums = valid.filter((n) => isBlocked(n, topBillType, numberLimits));
+      const allowedNums = valid.filter((n) => !isBlocked(n, topBillType, numberLimits));
       if (blockedNums.length > 0)
         setToastMsg({ text: `🔒 ${t.numberLabel} ${blockedNums.join(", ")} ${t.blockedNumberMessage}`, type: "error" });
       if (allowedNums.length > 0)
@@ -147,6 +176,14 @@ export default function BetQuickForm({
   };
 
   function expandNumber(digits: string): string[] {
+    if (betType === "2perm") {
+      const rev = digits.split("").reverse().join("");
+      return rev === digits ? [digits] : [digits, rev];
+    }
+    if (betType === "3perm") {
+      const rev = digits.split("").reverse().join("");
+      return rev === digits ? [digits] : [digits, rev];
+    }
     if (betType === "6perm")  return permutations(digits);
     if (betType === "19door") return nineteenDoor(digits);
     return [digits];
@@ -158,8 +195,8 @@ export default function BetQuickForm({
     if (digits.length === maxDigits) {
       const expanded = expandNumber(digits);
 
-      const blockedNums = expanded.filter((n) => isBlocked(n, betType, numberLimits));
-      const allowedNums = expanded.filter((n) => !isBlocked(n, betType, numberLimits));
+      const blockedNums = expanded.filter((n) => isBlocked(n, topBillType, numberLimits));
+      const allowedNums = expanded.filter((n) => !isBlocked(n, topBillType, numberLimits));
       const dups = allowedNums.filter((n) => preview.includes(n));
 
       if (blockedNums.length > 0) {
@@ -237,11 +274,20 @@ export default function BetQuickForm({
         if (overLimit) { setToastMsg({ text: `${t.numberLabel} ${overLimit}: ${t.amountPerNumberExceeded.replace("{max}", String(topCtx.maxPerNumber))}`, type: "warning" }); return; }
       }
     }
+    // 3 ตัวโต๊ด: dedup กลุ่ม permutation ให้เหลือชุดเดียว
+    // เช่น กรอก 123 กับ 321 → เป็นกลุ่มเดียวกัน เหลือแค่ตัวแรก
+    const todNums = (bot > 0 && botBillType === "3tod")
+      ? preview.filter((num, idx) => {
+          const key = num.split("").sort().join("");
+          return preview.findIndex((n) => n.split("").sort().join("") === key) === idx;
+        })
+      : preview;
+
     if (bot > 0) {
       const err = validateAmount(bot, botCtx);
       if (err) { setToastMsg({ text: err, type: "warning" }); return; }
       if (botCtx?.maxPerNumber) {
-        const overLimit = preview.find((num) => {
+        const overLimit = todNums.find((num) => {
           const existing = bills.filter((b) => b.number === num && b.betType === botBillType).reduce((s, b) => s + b.bot + b.top, 0);
           return existing + bot > botCtx.maxPerNumber;
         });
@@ -249,7 +295,7 @@ export default function BetQuickForm({
       }
     }
 
-    // เช็ค duplicate แยกตาม betType ของ top และ bot
+    // เช็ค duplicate แยกตาม betType ของ top แ���ะ bot
     if (top > 0) {
       const dupes = preview.filter((num) =>
         bills.some((b) => b.number === num && b.betType === topBillType && b.top > 0)
@@ -260,7 +306,7 @@ export default function BetQuickForm({
       }
     }
     if (bot > 0) {
-      const dupes = preview.filter((num) =>
+      const dupes = todNums.filter((num) =>
         bills.some((b) => b.number === num && b.betType === botBillType && b.top > 0)
       );
       if (dupes.length > 0) {
@@ -274,6 +320,8 @@ export default function BetQuickForm({
     const newBills: BillRow[] = [];
     preview.forEach((num) => {
       if (top > 0) newBills.push({ id: genId(), slipNo, number: num, betType: topBillType, top, bot: 0, note, time });
+    });
+    todNums.forEach((num) => {
       if (bot > 0) newBills.push({ id: genId(), slipNo, number: num, betType: botBillType, top: bot, bot: 0, note, time });
     });
     onAddBills(newBills);
@@ -313,6 +361,21 @@ export default function BetQuickForm({
         ))}
       </div>
 
+      {/* Standard tab */}
+      {activeTab === "standard" && (
+        <BetStandardForm
+          betType={betType}
+          baseBetType={baseBetType}
+          selected3={selected3}
+          selected2={selected2}
+          selectedRun={selectedRun}
+          bills={bills}
+          numberLimits={numberLimits}
+          bettingContext={bettingContext}
+          onAddBills={onAddBills}
+        />
+      )}
+
       {/* Classic tab */}
       {activeTab === "classic" && (
         <BetClassicForm
@@ -326,7 +389,7 @@ export default function BetQuickForm({
         />
       )}
 
-      {activeTab !== "classic" && <div className="p-4">
+      {activeTab !== "classic" && activeTab !== "standard" && <div className="p-4">
         {/* Title */}
         <div className="mb-3">
           <p className="text-[16px] font-bold text-ap-primary">{tabLabels[activeTab]}</p>
@@ -335,7 +398,7 @@ export default function BetQuickForm({
 
         {/* Input area */}
         {activeTab === "slip" ? (
-          <div className="bg-ap-bg/50 rounded-2xl border border-ap-border p-4 mb-3">
+          <div className="bg-ap-bg/70 rounded-2xl border border-ap-border p-4 mb-3">
             <label className="text-[11px] text-ap-secondary font-bold mb-1.5 block uppercase tracking-wide">
               {t.pasteSlipLabel.replace("{digits}", String(maxDigits))}
             </label>
@@ -344,12 +407,12 @@ export default function BetQuickForm({
               onChange={(e) => handleSlipChange(e.target.value)}
               placeholder={`${t.pasteSlipPlaceholder.replace("{digits}", String(maxDigits))}\n${t.exampleLabel} ${maxDigits === 3 ? t.pasteSlipExample3 : t.pasteSlipExample2}`}
               rows={4}
-              className="w-full border-2 border-ap-border rounded-xl px-3 py-2.5 text-[15px] font-bold text-ap-primary outline-none focus:border-ap-blue bg-white transition-all resize-none leading-relaxed"
+              className="w-full border-2 border-ap-blue/40 rounded-xl px-3 py-3 text-[15px] font-bold text-ap-primary outline-none focus:border-ap-blue focus:ring-4 focus:ring-ap-blue/15 bg-white shadow-sm transition-all resize-none leading-relaxed"
             />
             <p className="mt-1.5 text-[11px] text-ap-tertiary">{t.pasteSlipHint}</p>
           </div>
         ) : (
-          <div className="bg-ap-bg/50 rounded-2xl border border-ap-border p-4 mb-3">
+          <div className="bg-ap-bg/70 rounded-2xl border border-ap-border p-4 mb-3">
             <label className="text-[11px] text-ap-secondary font-bold mb-1 block uppercase tracking-wide">
               {t.inputNumberLabel.replace("{digits}", String(maxDigits))}
             </label>
@@ -360,14 +423,14 @@ export default function BetQuickForm({
               onChange={(e) => handleNumberInput(e.target.value)}
               maxLength={maxDigits}
               placeholder={"·".repeat(maxDigits)}
-              className="w-full border-2 border-ap-border rounded-xl px-3 py-2.5 text-[20px] text-center font-bold text-ap-primary outline-none focus:border-ap-blue bg-white transition-all"
+              className="w-full border-2 border-ap-blue/40 rounded-xl px-3 py-3 text-[22px] text-center font-extrabold text-ap-primary outline-none focus:border-ap-blue focus:ring-4 focus:ring-ap-blue/15 bg-white shadow-sm transition-all placeholder:text-ap-tertiary/40"
             />
           </div>
         )}
 
         {/* Preview card */}
         <div className="rounded-2xl border border-ap-border bg-white mb-3 overflow-hidden">
-          <div className="px-4 py-2 flex items-center justify-between border-b border-ap-border bg-ap-bg/60">
+          <div className="px-4 py-2 flex items-center justify-between border-b border-ap-border bg-ap-bg/80">
             <div className="flex items-center gap-2">
               <span className="text-[12px] font-semibold text-ap-secondary uppercase tracking-wide">{t.previewTitle}</span>
               <span className="text-[12px] font-bold text-ap-primary tabular-nums">{preview.length} {t.countUnit}</span>
@@ -427,7 +490,7 @@ export default function BetQuickForm({
         </div>
 
         {/* บน / ล่าง / หมายเหตุ / เพิ่มบิล */}
-        <div className="bg-ap-bg/50 rounded-2xl border border-ap-border p-4 mb-3">
+        <div className="bg-ap-bg/70 rounded-2xl border border-ap-border p-4 mb-3">
           {/* บน + ล่าง/โต๊ด */}
           <div className="grid grid-cols-2 gap-2 mb-3">
             <div>
@@ -444,7 +507,7 @@ export default function BetQuickForm({
                 placeholder="—"
                 min={topCtx?.minBet ?? 1}
                 max={topCtx?.maxBet}
-                className="w-full border-2 border-ap-border rounded-xl px-3 py-2.5 text-[15px] text-center font-bold text-ap-blue outline-none focus:border-ap-blue bg-white transition-all disabled:bg-ap-bg disabled:text-ap-tertiary disabled:cursor-not-allowed"
+                className="w-full border-2 border-ap-blue/30 rounded-xl px-3 py-3 text-[16px] text-center font-extrabold text-ap-blue outline-none focus:border-ap-blue focus:ring-4 focus:ring-ap-blue/15 bg-blue-50/40 shadow-sm transition-all disabled:bg-ap-bg disabled:text-ap-tertiary disabled:cursor-not-allowed disabled:border-ap-border disabled:shadow-none"
               />
               {showTop && topCtx && (
                 <p className="mt-0.5 text-[10px] text-ap-tertiary text-center">
@@ -467,7 +530,7 @@ export default function BetQuickForm({
                 placeholder="—"
                 min={botCtx?.minBet ?? 1}
                 max={botCtx?.maxBet}
-                className="w-full border-2 border-ap-border rounded-xl px-3 py-2.5 text-[15px] text-center font-bold text-ap-green outline-none focus:border-ap-green bg-white transition-all disabled:bg-ap-bg disabled:text-ap-tertiary disabled:cursor-not-allowed"
+                className="w-full border-2 border-green-400/40 rounded-xl px-3 py-3 text-[16px] text-center font-extrabold text-ap-green outline-none focus:border-ap-green focus:ring-4 focus:ring-green-500/15 bg-green-50/40 shadow-sm transition-all disabled:bg-ap-bg disabled:text-ap-tertiary disabled:cursor-not-allowed disabled:border-ap-border disabled:shadow-none"
               />
               {showBot && botCtx && (
                 <p className="mt-0.5 text-[10px] text-ap-tertiary text-center">

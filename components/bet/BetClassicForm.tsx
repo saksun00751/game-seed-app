@@ -232,7 +232,7 @@ export default function BetClassicForm({ lotteryFlag, lotteryLogo, bills, number
   }, [canSubmit, rows, bills, note, onAddBills, dateLocale, ctx2top, ctx2bot, ctx3top, ctx3tod, t]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  const inputCls = "w-full text-center text-[13px] font-bold text-ap-primary outline-none bg-transparent tabular-nums py-1.5 focus:bg-ap-blue/5 transition-colors";
+  const inputCls = "w-full text-center text-[14px] font-extrabold text-ap-blue outline-none bg-white tabular-nums py-2 focus:bg-blue-50 focus:ring-2 focus:ring-inset focus:ring-ap-blue/20 transition-all placeholder:text-ap-tertiary/50 placeholder:font-normal";
 
   return (
     <div className="p-0">
@@ -357,7 +357,7 @@ export default function BetClassicForm({ lotteryFlag, lotteryLogo, bills, number
                   onKeyDown={handleNumKeyDown}
                   placeholder={t.inputNumberPlaceholder}
                   maxLength={3}
-                  className="w-full text-center text-[13px] font-bold text-ap-blue outline-none bg-transparent tabular-nums py-2 placeholder:text-ap-tertiary placeholder:font-normal placeholder:text-[11px]"
+                  className="w-full text-center text-[15px] font-extrabold text-ap-blue outline-none bg-white tabular-nums py-2.5 focus:bg-blue-50 focus:ring-2 focus:ring-inset focus:ring-ap-blue/20 transition-all placeholder:text-ap-tertiary placeholder:font-normal placeholder:text-[11px]"
                 />
               </td>
               <td className="border border-ap-border bg-ap-bg/40" />

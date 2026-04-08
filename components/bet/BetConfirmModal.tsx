@@ -28,6 +28,14 @@ function getAmountLabel(betType: BetTypeId, side: "top" | "bot", t: Record<strin
   return t.betTypeWinlay;
 }
 
+type SlipGroupKey = "top" | "bottom" | "tod";
+
+function getSlipGroupKey(betType: BetTypeId): SlipGroupKey {
+  if (betType === "3tod") return "tod";
+  if (betType === "2bot" || betType === "winlay") return "bottom";
+  return "top";
+}
+
 export default function BetConfirmModal({
   bills,
   lotteryName,
@@ -69,6 +77,11 @@ export default function BetConfirmModal({
   const today = new Date().toLocaleDateString(numberLocale, {
     day: "2-digit", month: "2-digit", year: "numeric",
   });
+  const groupMeta: { key: SlipGroupKey; label: string }[] = [
+    { key: "top", label: t.top },
+    { key: "bottom", label: t.bottom },
+    { key: "tod", label: t.tod },
+  ];
 
   // group by slipNo for display
   const slipGroups = bills.reduce<Record<string, BillRow[]>>((acc, b) => {
@@ -100,40 +113,42 @@ export default function BetConfirmModal({
         <div className="overflow-y-auto flex-1">
           {Object.entries(slipGroups).map(([slipNo, items]) => (
             <div key={slipNo} className="border-b border-ap-border last:border-0">
-              <div className="px-5 py-2 bg-ap-bg/60">
+              <div className="px-5 py-2 bg-ap-bg/80">
                 <span className="text-[10px] font-bold text-ap-tertiary uppercase tracking-wide">
                   {t.slipLabel} #{slipNo}
                 </span>
               </div>
-              {items.map((b) => {
-                const amt    = b.top + b.bot;
-                const amountRows = [
-                  b.top > 0 ? { side: "top" as const, amount: b.top } : null,
-                  b.bot > 0 ? { side: "bot" as const, amount: b.bot } : null,
-                ].filter(Boolean) as { side: "top" | "bot"; amount: number }[];
+              {groupMeta.map((group) => {
+                const grouped = items.filter((b) => getSlipGroupKey(b.betType) === group.key);
+                if (!grouped.length) return null;
                 return (
-                  <div key={b.id} className="px-5 py-2.5 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-ap-primary flex items-center justify-center shrink-0">
-                      <span className="text-white font-extrabold text-[13px] tabular-nums">{b.number}</span>
+                  <div key={`${slipNo}-${group.key}`} className="border-t border-ap-border">
+                    <div className="px-5 py-1.5 bg-ap-bg/60 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-ap-secondary uppercase tracking-wide">{group.label}</span>
+                      <span className="text-[10px] text-ap-tertiary font-semibold">{grouped.length} {t.items}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-[10px] font-bold text-violet-600 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full">
-                        {getBetTypeLabel(b.betType)}
-                      </span>
-                      <div className="mt-0.5 space-y-0.5">
-                        {amountRows.map((row, idx) => (
-                          <p key={`${b.id}-${row.side}-${idx}`} className="text-[12px] font-bold tabular-nums">
-                            <span className={row.side === "top" ? "text-ap-blue" : "text-ap-green"}>
-                              <span className="font-semibold text-[10px]">{getAmountLabel(b.betType, row.side, t as Record<string, string>)} </span>
-                              {row.amount}
+                    {grouped.map((b) => {
+                      const amt = b.top + b.bot;
+                      return (
+                        <div key={b.id} className="px-5 py-2.5 flex items-center gap-3 border-t border-ap-border first:border-t-0">
+                          <div className="w-10 h-10 rounded-xl bg-ap-primary flex items-center justify-center shrink-0">
+                            <span className="text-white font-extrabold text-[13px] tabular-nums">{b.number}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[10px] font-bold text-violet-600 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full">
+                              {getBetTypeLabel(b.betType)}
                             </span>
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-[13px] font-bold text-ap-primary tabular-nums">฿{amt.toLocaleString(numberLocale)}</p>
-                    </div>
+                            <p className="mt-0.5 text-[12px] font-bold tabular-nums text-ap-blue">
+                              <span className="font-semibold text-[10px]">{getAmountLabel(b.betType, "top", t as Record<string, string>)} </span>
+                              {amt}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-[13px] font-bold text-ap-primary tabular-nums">฿{amt.toLocaleString(numberLocale)}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -147,7 +162,7 @@ export default function BetConfirmModal({
         </div>
 
         {/* Summary */}
-        <div className="shrink-0 border-t border-ap-border bg-ap-bg/50 px-5 py-3 space-y-1.5">
+        <div className="shrink-0 border-t border-ap-border bg-ap-bg/70 px-5 py-3 space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[12px] text-ap-secondary">{t.totalItems}</span>
             <span className="text-[12px] font-semibold text-ap-primary">{bills.length} {t.items}</span>

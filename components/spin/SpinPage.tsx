@@ -60,7 +60,7 @@ export default function SpinPage({
           spins:    8,
         },
       });
-      wheelRef.current.draw();
+      // wheelRef.current.draw();
     };
 
     const loadWheel = () => {
@@ -86,9 +86,9 @@ export default function SpinPage({
     setIsSpinning(true);
 
     // Reset wheel before each spin
-    wheelRef.current.stopAnimation(false);
-    wheelRef.current.rotationAngle = 0;
-    wheelRef.current.draw();
+    // wheelRef.current.stopAnimation(false);
+    // wheelRef.current.rotationAngle = 0;
+    // wheelRef.current.draw();
 
     const result = await spinWheelAction();
 
@@ -98,9 +98,20 @@ export default function SpinPage({
       return;
     }
 
-    console.log("[spin] code:", result.code, "prize:", result.prize);
-    wheelRef.current.animation.stopAngle        = result.prize;
-    wheelRef.current.animation.callbackFinished = () => {
+    const stopAngle = 355;
+    // if (stopAngle == null) {
+    //   toast.error("ไม่สามารถหมุนวงล้อได้ กรุณาลองใหม่");
+    //   setIsSpinning(false);
+    //   return;
+    // }
+
+    // wheelRef.current.animation.stopAngle = stopAngle;
+
+    const animDuration = (wheelRef.current.animation.duration ?? 5) * 5000;
+    let shown = false;
+    const showResult = () => {
+      if (shown) return;
+      shown = true;
       toast.success(result.title ?? "ยินดีด้วย!", {
         description: result.msg,
         duration:    5000,
@@ -109,7 +120,11 @@ export default function SpinPage({
       setIsSpinning(false);
     };
 
+    wheelRef.current.animation.callbackFinished = showResult;
     wheelRef.current.startAnimation();
+
+    // Fallback กรณี Winwheel callback ไม่ถูกเรียก
+    setTimeout(showResult, animDuration + 500);
   };
 
   return (
