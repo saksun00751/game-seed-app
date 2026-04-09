@@ -12,7 +12,7 @@ interface Props {
   t:        T;
 }
 
-const LIMITS = [10, 30, 50];
+const LIMITS = [20, 50, 100];
 
 export default function TicketSearch({ search, drawDate, limit, t }: Props) {
   const router    = useRouter();
@@ -27,8 +27,8 @@ export default function TicketSearch({ search, drawDate, limit, t }: Props) {
       if (v !== "" && v !== 0) q.set(k, String(v));
       else                     q.delete(k);
     }
-    // Remove limit from URL if it's the default (10)
-    if (q.get("limit") === "10") q.delete("limit");
+    // Remove limit from URL if it's the default (20)
+    if (q.get("limit") === "20") q.delete("limit");
     router.push(`${pathname}?${q.toString()}`);
   }
 

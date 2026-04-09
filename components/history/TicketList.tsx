@@ -53,9 +53,24 @@ export default function TicketList({ tickets, t }: { tickets: Ticket[]; t: T }) 
         const isLoading = loading === String(ticket.id);
         const totalBill = Number(ticket.total_net_amount || ticket.total_amount);
         const totalWin = Number(ticket.total_win_amount || 0);
+        const statusText = ticket.result_outcome_label
+          || ticket.draw_status_label
+          || STATUS_LABEL[ticket.status]
+          || ticket.status;
         const statusLabel = ticket.status === "won" && totalWin > 0
-          ? `${STATUS_LABEL[ticket.status] ?? ticket.status} (+${fmtMoney(totalWin)})`
-          : (STATUS_LABEL[ticket.status] ?? ticket.status);
+          ? `${statusText} (+${fmtMoney(totalWin)})`
+          : statusText;
+        const itemCount = ticket.item_count ?? 0;
+        const winningCount = ticket.winning_item_count ?? 0;
+        const pendingCount = ticket.pending_item_count ?? 0;
+        const metaText = ticket.cancel_reason
+          || ticket.result_message
+          || (ticket.status === "won" && winningCount > 0
+            ? `${winningCount}/${itemCount || winningCount} ถูกรางวัล`
+            : ticket.status === "active" && pendingCount > 0
+            ? `รอผล ${pendingCount} รายการ`
+            : ticket.draw_status_label
+            || `${itemCount || 0} รายการ`);
 
         const [datePart, timePart] = ticket.created_at.split(" ");
 
@@ -79,17 +94,32 @@ export default function TicketList({ tickets, t }: { tickets: Ticket[]; t: T }) 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <span className="text-[14px] font-bold text-ap-primary truncate">{ticket.market_name}</span>
-                <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLE[ticket.status] ?? "bg-ap-bg text-ap-secondary"}`}>
+                <span
+                  title={ticket.cancel_reason ?? ticket.result_message ?? undefined}
+                  className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLE[ticket.status] ?? "bg-ap-bg text-ap-secondary"}`}
+                >
                   {statusLabel}
                 </span>
               </div>
-                <p className="text-[11px] text-ap-secondary">
+              <p className="text-[11px] text-ap-secondary">
                 {ticket.group_name}
                 <span className="mx-1.5 text-ap-border">·</span>
                 {t.draw} {ticket.draw_date}
                 <span className="mx-1.5 text-ap-border">·</span>
                 {timePart ?? datePart}
               </p>
+              <p className="text-[11px] text-ap-tertiary mt-1 truncate" title={metaText}>
+                {metaText}
+              </p>
+              {ticket.cancelled_at && (
+                <p
+                  className="text-[10px] text-ap-tertiary mt-0.5 truncate"
+                  title={[ticket.cancelled_by_name, ticket.cancelled_by_type, ticket.cancel_reason].filter(Boolean).join(" · ")}
+                >
+                  ยกเลิกเมื่อ {ticket.cancelled_at}
+                  {ticket.cancelled_by_name ? ` โดย ${ticket.cancelled_by_name}` : ""}
+                </p>
+              )}
             </div>
 
             {/* Amount */}

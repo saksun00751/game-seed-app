@@ -10,14 +10,29 @@ import TicketSearch from "@/components/history/TicketSearch";
 export const metadata: Metadata = { title: "โพยหวย — Lotto" };
 
 export interface Ticket {
-  id:          number;
-  draw_id:     number;
-  draw_date:   string;
-  market_name: string;
-  market_logo: string;
-  market_icon: string;
-  group_name:  string;
-  status:      string;
+  id:                 number;
+  draw_id:            number;
+  draw_date:          string;
+  market_name:        string;
+  market_logo:        string;
+  market_icon:        string;
+  group_name:         string;
+  status:             string;
+  draw_status?:       string;
+  draw_status_label?: string;
+  result_outcome?:    string;
+  result_outcome_label?: string;
+  result_message?:    string;
+  is_final?:          boolean;
+  is_winner?:         boolean;
+  item_count?:        number;
+  winning_item_count?: number;
+  losing_item_count?:  number;
+  pending_item_count?: number;
+  cancelled_at?:       string | null;
+  cancelled_by_name?:  string | null;
+  cancelled_by_type?:  string | null;
+  cancel_reason?:      string | null;
   total_amount:          number;
   total_bet_amount:      number;
   total_discount_amount: number;
@@ -29,6 +44,14 @@ export interface Ticket {
 interface TicketsResponse {
   success: boolean;
   data:    Ticket[];
+  pagination?: {
+    page?: number;
+    limit?: number;
+    count?: number;
+    total?: number;
+    has_more?: boolean;
+  };
+  language?: string;
 }
 
 interface Props {
@@ -58,32 +81,40 @@ export default async function HistoryPage({ params, searchParams }: Props) {
   const status    = sp?.status    ?? "all";
   const search    = sp?.search    ?? "";
   const drawDate  = sp?.draw_date ?? "";
-  const limit     = [10, 30, 50].includes(Number(sp?.limit)) ? Number(sp!.limit) : 10;
+  const limit     = [20, 50, 100].includes(Number(sp?.limit)) ? Number(sp!.limit) : 20;
   const page      = Math.max(1, Number(sp?.page ?? 1));
 
   let tickets: Ticket[] = [];
+  let serverPage = page;
+  let serverLimit = limit;
+  let total = 0;
+  let hasMore = false;
   try {
-    const res = await apiGet<TicketsResponse>("/lotto/tickets", apiToken ?? undefined, lang);
-    tickets = res?.data ?? [];
-  } catch {}
+    const q = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    if (status !== "all") q.set("status", status);
+    if (search) q.set("search", search);
+    if (drawDate) q.set("draw_date", drawDate);
 
-  const filtered = tickets.filter((t) => {
-    if (status !== "all" && t.status !== status) return false;
-    if (search && !t.market_name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (drawDate && t.draw_date !== drawDate) return false;
-    return true;
-  });
-  const total      = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-  const pageItems  = filtered.slice((page - 1) * limit, page * limit);
+    const res = await apiGet<TicketsResponse>(`/lotto/tickets?${q.toString()}`, apiToken ?? undefined, lang);
+    tickets = res?.data ?? [];
+    serverPage = Math.max(1, Number(res?.pagination?.page ?? page));
+    serverLimit = Math.min(100, Math.max(1, Number(res?.pagination?.limit ?? limit)));
+    total = Math.max(0, Number(res?.pagination?.total ?? tickets.length));
+    hasMore = Boolean(res?.pagination?.has_more);
+  } catch {}
+  const totalPages = Math.max(1, Math.ceil(total / serverLimit));
+  const pageItems  = tickets;
 
   function buildHref(overrides: Record<string, string | number>) {
     const q = new URLSearchParams();
-    const merged = { status, search, draw_date: drawDate, limit, page, ...overrides };
+    const merged = { status, search, draw_date: drawDate, limit: serverLimit, page: serverPage, ...overrides };
     if (merged.status && merged.status !== "all") q.set("status",    String(merged.status));
     if (merged.search)                            q.set("search",    String(merged.search));
     if (merged.draw_date)                         q.set("draw_date", String(merged.draw_date));
-    if (Number(merged.limit) !== 10)              q.set("limit",     String(merged.limit));
+    if (Number(merged.limit) !== 20)              q.set("limit",     String(merged.limit));
     if (Number(merged.page) > 1)                  q.set("page",      String(merged.page));
     return `/${locale}/history${q.toString() ? `?${q}` : ""}`;
   }
@@ -93,9 +124,9 @@ export default async function HistoryPage({ params, searchParams }: Props) {
     for (let i = 1; i <= totalPages; i++) pageNums.push(i);
   } else {
     pageNums.push(1);
-    if (page > 3) pageNums.push("...");
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pageNums.push(i);
-    if (page < totalPages - 2) pageNums.push("...");
+    if (serverPage > 3) pageNums.push("...");
+    for (let i = Math.max(2, serverPage - 1); i <= Math.min(totalPages - 1, serverPage + 1); i++) pageNums.push(i);
+    if (serverPage < totalPages - 2) pageNums.push("...");
     pageNums.push(totalPages);
   }
 
@@ -118,7 +149,7 @@ export default async function HistoryPage({ params, searchParams }: Props) {
         </div>
 
         {/* Search */}
-        <TicketSearch search={search} drawDate={drawDate} limit={limit} t={t} />
+        <TicketSearch search={search} drawDate={drawDate} limit={serverLimit} t={t} />
 
         {/* Status tabs */}
         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
@@ -155,8 +186,8 @@ export default async function HistoryPage({ params, searchParams }: Props) {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-1 py-2 flex-wrap">
-            {page > 1 ? (
-              <Link href={buildHref({ page: page - 1 })}
+            {serverPage > 1 ? (
+              <Link href={buildHref({ page: serverPage - 1 })}
                 className="px-3 py-2 bg-white border border-ap-border rounded-xl text-[13px] font-semibold text-ap-secondary hover:bg-ap-bg transition-colors">←</Link>
             ) : (
               <span className="px-3 py-2 rounded-xl text-[13px] text-ap-border select-none">←</span>
@@ -168,14 +199,14 @@ export default async function HistoryPage({ params, searchParams }: Props) {
                 <Link key={n} href={buildHref({ page: n })}
                   className={[
                     "min-w-[36px] h-9 flex items-center justify-center rounded-xl text-[13px] font-semibold transition-colors",
-                    page === n ? "bg-ap-blue text-white" : "bg-white border border-ap-border text-ap-secondary hover:bg-ap-bg",
+                    serverPage === n ? "bg-ap-blue text-white" : "bg-white border border-ap-border text-ap-secondary hover:bg-ap-bg",
                   ].join(" ")}>
                   {n}
                 </Link>
               )
             )}
-            {page < totalPages ? (
-              <Link href={buildHref({ page: page + 1 })}
+            {hasMore || serverPage < totalPages ? (
+              <Link href={buildHref({ page: serverPage + 1 })}
                 className="px-3 py-2 bg-white border border-ap-border rounded-xl text-[13px] font-semibold text-ap-secondary hover:bg-ap-bg transition-colors">→</Link>
             ) : (
               <span className="px-3 py-2 rounded-xl text-[13px] text-ap-border select-none">→</span>
