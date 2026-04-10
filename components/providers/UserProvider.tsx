@@ -228,7 +228,7 @@ export default function UserProvider({
         const cluster = typeof config.cluster === "string" && config.cluster
           ? config.cluster
           : "mt1";
-        const publicApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://api.1168lot.com/api/v1").replace(/\/$/, "");
+        const publicApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://api.huayinter88.com/api/v1").replace(/\/$/, "");
         const authEndpoint = publicApiBase.endsWith("/api/v1")
           ? `${publicApiBase}/realtime/auth`
           : `${publicApiBase}/api/v1/realtime/auth`;

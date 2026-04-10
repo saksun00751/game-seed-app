@@ -119,7 +119,7 @@ export default function PackageModalButton({
       setSelecting(false);
     }
     setOpen(false);
-    router.push(`/${locale}/bet?draw_id=${drawId}&package_id=${packageId}`);
+    router.push(`/${locale}/bet/${drawId}/${packageId}`);
   }
 
   if (expired) {

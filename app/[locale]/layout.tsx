@@ -28,8 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
     };
   } catch {
     return {
-      title: "1168lot.com",
-      description: "1168lot สนุกทุกเกมดัง สล็อต คาสิโน กีฬา",
+      title: "huayinter88.com",
+      description: "huayinter88 สนุกทุกเกมดัง สล็อต คาสิโน กีฬา",
     };
   }
 }

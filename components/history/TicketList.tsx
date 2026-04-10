@@ -14,7 +14,7 @@ const STATUS_STYLE: Record<string, string> = {
   cancelled: "bg-ap-bg text-ap-tertiary",
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://api.1168lot.com";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://api.huayinter88.com";
 
 interface T { statusActive: string; statusWon: string; statusLost: string; statusPending: string; statusCancelled: string; draw: string; }
 

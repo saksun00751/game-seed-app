@@ -1,4 +1,4 @@
-const API_BASE = process.env.API_BASE_URL ?? "http://api.1168lot.com/api/v1";
+const API_BASE = process.env.API_BASE_URL ?? "http://api.huayinter88.com/api/v1";
 const API_ERROR_EVENT = "app:api-error";
 
 export class ApiError extends Error {

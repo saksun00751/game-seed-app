@@ -13,7 +13,7 @@ export default function ContactFAB() {
         <>
           {/* Line */}
           <a
-            href="https://line.me/ti/p/~@1168lot"
+            href="https://line.me/ti/p/~@huayinter88"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2.5 bg-white rounded-full pl-3 pr-4 py-2.5 shadow-card-xl border border-ap-border hover:scale-105 transition-transform animate-fade-up"
@@ -29,7 +29,7 @@ export default function ContactFAB() {
 
           {/* Telegram */}
           <a
-            href="https://t.me/1168lot"
+            href="https://t.me/huayinter88"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2.5 bg-white rounded-full pl-3 pr-4 py-2.5 shadow-card-xl border border-ap-border hover:scale-105 transition-transform animate-fade-up"

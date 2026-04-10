@@ -4,13 +4,25 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'service.1168lot.com',
+        hostname: 'service.huayinter88.com',
       },
       {
         protocol: 'https',
-        hostname: 'api.1168lot.com',
+        hostname: 'api.huayinter88.com',
       },
     ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/:locale/bet/:draw_id(\\d+)/:package_id(\\d+)',
+        destination: '/:locale/bet?draw_id=:draw_id&package_id=:package_id',
+      },
+      {
+        source: '/:locale/bet/:draw_id(\\d+)',
+        destination: '/:locale/bet?draw_id=:draw_id',
+      },
+    ]
   },
 }
 module.exports = nextConfig

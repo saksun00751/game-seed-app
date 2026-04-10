@@ -96,7 +96,7 @@ export function mapMarketsToCategories(groups: ApiGroup[]): Category[] {
           drawDate:   formatDrawDate(draw.draw_date),
           drawId:     draw.draw_id,
           barClass:   meta.barClass,
-          href:       isOpen ? `/bet?draw_id=${draw.draw_id}` : "",
+          href:       isOpen ? `/bet/${draw.draw_id}` : "",
           
         };
       });

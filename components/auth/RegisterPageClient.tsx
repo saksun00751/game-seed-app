@@ -21,7 +21,7 @@ function RegisterContent({ defaultRef, banks, logoUrl }: Props) {
       {/* Logo + heading */}
       <div className="text-center mb-8">
         <div className="flex justify-center mb-4">
-          <Image src={logoUrl} alt="1168Lot" width={200} height={200} className="h-40 w-auto object-contain" priority />
+          <Image src={logoUrl} alt="huayinter88" width={200} height={200} className="h-40 w-auto object-contain" priority />
         </div>
 
         <div className="mt-4">

@@ -9,6 +9,6 @@ interface Props {
 
 export default async function TransactionsPage({ params }: Props) {
   const { locale } = (await params) ?? { locale: "th" };
-  const apiBase = process.env.API_BASE_URL ?? "https://api.1168lot.com/api/v1";
+  const apiBase = process.env.API_BASE_URL ?? "https://api.huayinter88.com/api/v1";
   return <TransactionsPageClient locale={locale} apiBase={apiBase} />;
 }

@@ -86,7 +86,7 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone 
           <Link href={`/${lang}/dashboard`} className="flex items-center flex-shrink-0 group">
             <Image
               src={logoUrl}
-              alt="1168Lot"
+              alt="huayinter88"
               width={200}
               height={200}
               className="h-24 w-auto object-contain group-hover:opacity-90 transition-opacity"
