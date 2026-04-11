@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { registerAction } from "@/lib/actions";
+import { apiPost } from "@/lib/api/client";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
@@ -218,6 +219,9 @@ export default function RegisterForm({ defaultRef = "", banks = [] }: { defaultR
   const [lastname, setLastname]         = useState("");
   const [bankCode, setBankCode]         = useState<number | null>(null);
   const [accNo, setAccNo]               = useState("");
+  const [accName, setAccName]           = useState("");
+  const [accNameLoading, setAccNameLoading] = useState(false);
+  const [accNameError, setAccNameError] = useState("");
   const [toastMsg, setToastMsg]         = useState("");
   const [toastQueue, setToastQueue]     = useState<string[]>([]);
 
@@ -255,6 +259,49 @@ export default function RegisterForm({ defaultRef = "", banks = [] }: { defaultR
     setToastMsg(toastQueue[0]);
     setToastQueue((prev) => prev.slice(1));
   }, [toastMsg, toastQueue]);
+
+  useEffect(() => {
+    setAccName("");
+    setAccNameError("");
+    if (bankCode == null || bankCode === 18 || accNo.length < 10) {
+      setAccNameLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setAccNameLoading(true);
+    (async () => {
+      try {
+        const res = await apiPost<{
+          success?: boolean;
+          message?: string;
+          data?: {
+            valid?: boolean;
+            bank?: number;
+            acc_no?: string;
+            bank_shortcode?: string;
+            account_name?: string;
+            firstname?: string;
+            lastname?: string;
+          };
+        }>("/auth/register/bank-account-name", { bank: bankCode, acc_no: accNo }, undefined, lang);
+        if (cancelled) return;
+        const d = res.data;
+        if (d?.account_name) {
+          setAccName(d.account_name);
+          setFirstname(d.firstname ?? "");
+          setLastname(d.lastname ?? "");
+        } else {
+          setAccNameError(res.message ?? "");
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setAccNameError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+      } finally {
+        if (!cancelled) setAccNameLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [bankCode, accNo, lang]);
 
   const phoneComplete   = phoneDisplay.replace(/\D/g, "").length === 10;
   const confirmMatch    = confirmPassword.length > 0 && confirmPassword === password;
@@ -295,23 +342,36 @@ export default function RegisterForm({ defaultRef = "", banks = [] }: { defaultR
         <input type="hidden" name="lang" value={lang} />
         {marketing && <input type="hidden" name="marketing" value={marketing} />}
 
-        {/* Phone */}
-        <Input
-          label={<>{t.phone}{reqText}</>} name="user_name" type="tel" inputMode="tel"
-          placeholder="0XX-XXX-XXXX" autoComplete="tel"
-          value={phoneDisplay}
-          onChange={(e) => setPhoneDisplay(formatPhone(e.target.value.replace(/\D/g, "").slice(0, 10)))}
-          error={state.fieldErrors?.user_name}
-          leftEl={<PhoneIcon />}
-          rightEl={phoneComplete ? (
-            <div className="w-5 h-5 rounded-full bg-ap-green flex items-center justify-center animate-pop-in">
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-          ) : null}
-          hint={!state.fieldErrors?.user_name ? t.phoneHint : undefined}
-        />
+        {/* Bank */}
+        <div className="flex flex-col gap-1">
+          <label className="text-[13px] font-medium text-ap-primary">{t.bank}<span className="text-ap-red ml-1 text-[11px] font-semibold">(จำเป็น)</span></label>
+          <input type="hidden" name="bank" value={bankCode ?? ""} />
+          <BankSelect
+            banks={banks} value={bankCode} onChange={setBankCode}
+            placeholder={t.bankSelect}
+            hasError={!!state.fieldErrors?.bank}
+          />
+          {state.fieldErrors?.bank && (
+            <p className="text-[12px] text-ap-red mt-0.5">{state.fieldErrors.bank}</p>
+          )}
+        </div>
+
+        {/* Account number */}
+        <div className="flex flex-col gap-1">
+          <Input
+            label={<>{t.accNo}{reqText}</>} name="acc_no" type="text" inputMode="numeric"
+            placeholder={t.accNoPlaceholder}
+            value={accNo} onChange={(e) => setAccNo(e.target.value.replace(/\D/g, "").slice(0, 14))}
+            error={state.fieldErrors?.acc_no || (accNameError || undefined)}
+            leftEl={<CardIcon />}
+          />
+          {accNameLoading && (
+            <p className="text-[12px] text-ap-tertiary">กำลังตรวจสอบชื่อบัญชี...</p>
+          )}
+          {accName && !accNameLoading && (
+            <p className="text-[12px] text-ap-green">✓ {accName}</p>
+          )}
+        </div>
 
         {/* Name row */}
         <div className="grid grid-cols-2 gap-3">
@@ -330,6 +390,24 @@ export default function RegisterForm({ defaultRef = "", banks = [] }: { defaultR
             leftEl={<UserIcon />}
           />
         </div>
+
+        {/* Phone */}
+        <Input
+          label={<>{t.phone}{reqText}</>} name="user_name" type="tel" inputMode="tel"
+          placeholder="0XX-XXX-XXXX" autoComplete="tel"
+          value={phoneDisplay}
+          onChange={(e) => setPhoneDisplay(formatPhone(e.target.value.replace(/\D/g, "").slice(0, 10)))}
+          error={state.fieldErrors?.user_name}
+          leftEl={<PhoneIcon />}
+          rightEl={phoneComplete ? (
+            <div className="w-5 h-5 rounded-full bg-ap-green flex items-center justify-center animate-pop-in">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          ) : null}
+          hint={!state.fieldErrors?.user_name ? t.phoneHint : undefined}
+        />
 
         {/* Password */}
         <div className="flex flex-col gap-2">
@@ -371,29 +449,6 @@ export default function RegisterForm({ defaultRef = "", banks = [] }: { defaultR
               </button>
             </div>
           }
-        />
-
-        {/* Bank */}
-        <div className="flex flex-col gap-1">
-          <label className="text-[13px] font-medium text-ap-primary">{t.bank}<span className="text-ap-red ml-1 text-[11px] font-semibold">(จำเป็น)</span></label>
-          <input type="hidden" name="bank" value={bankCode ?? ""} />
-          <BankSelect
-            banks={banks} value={bankCode} onChange={setBankCode}
-            placeholder={t.bankSelect}
-            hasError={!!state.fieldErrors?.bank}
-          />
-          {state.fieldErrors?.bank && (
-            <p className="text-[12px] text-ap-red mt-0.5">{state.fieldErrors.bank}</p>
-          )}
-        </div>
-
-        {/* Account number */}
-        <Input
-          label={<>{t.accNo}{reqText}</>} name="acc_no" type="text" inputMode="numeric"
-          placeholder={t.accNoPlaceholder}
-          value={accNo} onChange={(e) => setAccNo(e.target.value.replace(/\D/g, "").slice(0, 12))}
-          error={state.fieldErrors?.acc_no}
-          leftEl={<CardIcon />}
         />
 
         {/* Referral code */}
