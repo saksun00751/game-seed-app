@@ -22,15 +22,206 @@ interface LoadBankAccount {
   remark:      string;
 }
 
+interface PaymentOption {
+  id:          string;
+  name:        string;
+  min_deposit: number;
+  payment_url: string;
+  remark:      string;
+}
+
 interface LoadBankApiPayload {
   success?: boolean;
   message?: string;
-  bank?: LoadBankAccount[];
+  bank?: LoadBankAccount[] | Record<string, Partial<LoadBankAccount>>;
   data?: {
     bank?: LoadBankAccount[];
     items?: LoadBankAccount[];
     accounts?: LoadBankAccount[];
   } | LoadBankAccount[];
+}
+
+interface PaymentApiPayload {
+  success?: boolean;
+  message?: string;
+  bank?: Record<string, Partial<PaymentOption>>;
+}
+
+interface QrCodeData {
+  request_id: string;
+  txid: string;
+  status: string;
+  amount: number;
+  payamount: number;
+  qrcode: string;
+  qr_string: string;
+  expired_date: string;
+  member: {
+    user_name: string;
+    name: string;
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function pickRequestId(payload: unknown): string | null {
+  const rec = asRecord(payload);
+  if (!rec) return null;
+
+  const rootRequestId =
+    (typeof rec.request_id === "string" ? rec.request_id.trim() : "")
+    || (typeof rec.requestId === "string" ? rec.requestId.trim() : "");
+  if (rootRequestId) return rootRequestId;
+
+  const dataRec = asRecord(rec.data);
+  const dataRequestId =
+    (typeof dataRec?.request_id === "string" ? dataRec.request_id.trim() : "")
+    || (typeof dataRec?.requestId === "string" ? dataRec.requestId.trim() : "");
+  if (dataRequestId) return dataRequestId;
+
+  const url =
+    (typeof rec.url === "string" ? rec.url.trim() : "")
+    || (typeof dataRec?.url === "string" ? dataRec.url.trim() : "");
+  if (!url) return null;
+
+  try {
+    const pathname = new URL(url).pathname;
+    const last = pathname.split("/").filter(Boolean).pop() ?? "";
+    return last || null;
+  } catch {
+    const last = url.split("/").filter(Boolean).pop() ?? "";
+    return last || null;
+  }
+}
+
+function normalizeQrData(payload: unknown): QrCodeData | null {
+  const root = asRecord(payload);
+  const data = asRecord(root?.data);
+  if (!data) return null;
+
+  const request_id = typeof data.request_id === "string" ? data.request_id : "";
+  const txid = typeof data.txid === "string" ? data.txid : "";
+  const status = typeof data.status === "string" ? data.status : "";
+  const qrcode = typeof data.qrcode === "string" ? data.qrcode : "";
+  if (!request_id || !qrcode) return null;
+
+  const amountRaw = data.amount;
+  const payAmountRaw = data.payamount;
+  const amount = typeof amountRaw === "number" ? amountRaw : Number(amountRaw) || 0;
+  const payamount = typeof payAmountRaw === "number" ? payAmountRaw : Number(payAmountRaw) || 0;
+  const qr_string = typeof data.qr_string === "string" ? data.qr_string : "";
+  const expired_date = typeof data.expired_date === "string" ? data.expired_date : "";
+  const memberRec = asRecord(data.member);
+
+  return {
+    request_id,
+    txid,
+    status,
+    amount,
+    payamount,
+    qrcode,
+    qr_string,
+    expired_date,
+    member: {
+      user_name: typeof memberRec?.user_name === "string" ? memberRec.user_name : "",
+      name: typeof memberRec?.name === "string" ? memberRec.name : "",
+    },
+  };
+}
+
+function parseExpiredDateMs(raw: string): number | null {
+  const text = raw.trim();
+  if (!text) return null;
+
+  const m = text.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
+  if (m) {
+    const [, y, mo, d, h, mi, s] = m;
+    return new Date(
+      Number(y),
+      Number(mo) - 1,
+      Number(d),
+      Number(h),
+      Number(mi),
+      Number(s),
+    ).getTime();
+  }
+
+  const parsed = Date.parse(text);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function formatCountdown(totalSec: number): string {
+  const sec = Math.max(0, totalSec);
+  const hh = Math.floor(sec / 3600);
+  const mm = Math.floor((sec % 3600) / 60);
+  const ss = sec % 60;
+
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return hh > 0 ? `${p2(hh)}:${p2(mm)}:${p2(ss)}` : `${p2(mm)}:${p2(ss)}`;
+}
+
+function pickErrorMessage(payload: unknown, fallback: string): string {
+  const rec = asRecord(payload);
+  if (!rec) return fallback;
+  const msg = rec.message ?? rec.msg ?? rec.error;
+  return typeof msg === "string" && msg.trim() ? msg : fallback;
+}
+
+function isApiSuccessFalse(payload: unknown): boolean {
+  const rec = asRecord(payload);
+  if (!rec) return false;
+  if (rec.success === false) return true;
+  const data = asRecord(rec.data);
+  if (data?.success === false) return true;
+  return false;
+}
+
+function pickDepositStatus(payload: unknown): string {
+  const rec = asRecord(payload);
+  const data = asRecord(rec?.data);
+  const candidate =
+    data?.status
+    ?? rec?.status
+    ?? data?.payment_status
+    ?? rec?.payment_status
+    ?? data?.state
+    ?? rec?.state
+    ?? "";
+  return typeof candidate === "string" ? candidate.trim().toLowerCase() : String(candidate ?? "").trim().toLowerCase();
+}
+
+function isPaidLikeStatus(status: string): boolean {
+  const words = status.split(/[^a-z]+/).filter(Boolean);
+  return words.includes("paid") || words.includes("success") || words.includes("complete");
+}
+
+function isExpiredStatus(status: string): boolean {
+  const words = status.split(/[^a-z]+/).filter(Boolean);
+  return words.includes("expired") || words.includes("expire");
+}
+
+function normalizePayment(
+  id: string,
+  p: Partial<PaymentOption> | undefined,
+): PaymentOption | null {
+  if (!p?.name) return null;
+  return {
+    id:          p.id ?? id,
+    name:        p.name,
+    min_deposit: typeof p.min_deposit === "number" ? p.min_deposit : Number(p.min_deposit) || 0,
+    payment_url: p.payment_url ?? "",
+    remark:      p.remark ?? "",
+  };
+}
+
+function extractPayments(payload: PaymentApiPayload): PaymentOption[] {
+  if (!payload.bank || typeof payload.bank !== "object" || Array.isArray(payload.bank)) return [];
+  return Object.entries(payload.bank)
+    .map(([k, p]) => normalizePayment(k, p))
+    .filter(Boolean) as PaymentOption[];
 }
 
 function normalizeAccount(
@@ -213,6 +404,17 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
   const [bankError,      setBankError]      = useState<string | null>(null);
   const [selectedBank,   setSelectedBank]   = useState<LoadBankAccount | null>(null);
 
+  // ── Payment options (for "payment" channel) ────────────────────────────────
+  const [payments,        setPayments]        = useState<PaymentOption[]>([]);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentOption | null>(null);
+  const [paymentAmount,   setPaymentAmount]   = useState<string>("");
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [qrCodeData,        setQrCodeData]        = useState<QrCodeData | null>(null);
+  const [nowTs,             setNowTs]             = useState<number>(Date.now());
+  const [expireDoneTxids,   setExpireDoneTxids]   = useState<Record<string, true>>({});
+  const [statusSettledTxids, setStatusSettledTxids] = useState<Record<string, true>>({});
+  const [statusModal, setStatusModal] = useState<{ kind: "success" | "expired"; message: string } | null>(null);
+
   useEffect(() => {
     fetch("/api/deposit/channels")
       .then((r) => r.json())
@@ -277,6 +479,14 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
     setMethod(ch);
     setBankAccounts([]);
     setSelectedBank(null);
+    setPayments([]);
+    setSelectedPayment(null);
+    setPaymentAmount("");
+    setQrCodeData(null);
+    setPaymentSubmitting(false);
+    setExpireDoneTxids({});
+    setStatusSettledTxids({});
+    setStatusModal(null);
     setBankError(null);
     setPhase("account");
     setBankLoading(true);
@@ -286,13 +496,24 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ method: ch }),
       });
-      const data: LoadBankApiPayload = await res.json();
-      const accounts = extractAccounts(data);
-      if (data.success && accounts.length > 0) {
-        setBankAccounts(accounts);
-        setSelectedBank(accounts[0]);
+      const data: LoadBankApiPayload & PaymentApiPayload = await res.json();
+
+      if (ch === "payment") {
+        const list = extractPayments(data as PaymentApiPayload);
+        if (data.success && list.length > 0) {
+          setPayments(list);
+          setSelectedPayment(list[0]);
+        } else {
+          setBankError(data.message ?? "ไม่สามารถโหลดข้อมูลช่องทาง Payment ได้");
+        }
       } else {
-        setBankError(data.message ?? "ไม่สามารถโหลดข้อมูลบัญชีได้");
+        const accounts = extractAccounts(data as LoadBankApiPayload);
+        if (data.success && accounts.length > 0) {
+          setBankAccounts(accounts);
+          setSelectedBank(accounts[0]);
+        } else {
+          setBankError(data.message ?? "ไม่สามารถโหลดข้อมูลบัญชีได้");
+        }
       }
     } catch {
       setBankError("ไม่สามารถเชื่อมต่อระบบได้");
@@ -300,6 +521,179 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
       setBankLoading(false);
     }
   }
+
+  async function createPaymentDeposit() {
+    if (!selectedPayment) return;
+
+    const amount = Number(paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
+    setPaymentSubmitting(true);
+    setQrCodeData(null);
+    setExpireDoneTxids({});
+    setStatusSettledTxids({});
+    setStatusModal(null);
+    setBankError(null);
+
+    try {
+      const createRes = await fetch("/api/smkpay/deposit/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+
+      let createData: unknown;
+      try {
+        createData = await createRes.json();
+      } catch {
+        createData = {
+          success: false,
+          message: "ไม่สามารถอ่านข้อมูล response ได้ (ไม่ใช่ JSON)",
+          status: createRes.status,
+        };
+      }
+
+      if (!createRes.ok || isApiSuccessFalse(createData)) {
+        setBankError(pickErrorMessage(createData, "ไม่สามารถสร้างรายการฝากเงินได้"));
+        return;
+      }
+
+      const requestId = pickRequestId(createData);
+      if (!requestId) {
+        setBankError("ไม่พบ request_id จากขั้นตอน create");
+        return;
+      }
+
+      const qrRes = await fetch(`/api/smkpay/qrcode/${encodeURIComponent(requestId)}`, {
+        method: "GET",
+      });
+
+      let qrData: unknown;
+      try {
+        qrData = await qrRes.json();
+      } catch {
+        qrData = {
+          success: false,
+          message: "ไม่สามารถอ่านข้อมูล QR response ได้ (ไม่ใช่ JSON)",
+          status: qrRes.status,
+        };
+      }
+
+      if (!qrRes.ok || isApiSuccessFalse(qrData)) {
+        setBankError(pickErrorMessage(qrData, "ไม่สามารถโหลด QR Code ได้"));
+        return;
+      }
+
+      const normalized = normalizeQrData(qrData);
+      if (!normalized) {
+        setBankError("รูปแบบข้อมูล QR ไม่ถูกต้อง หรือไม่มี qrcode");
+        return;
+      }
+
+      setQrCodeData(normalized);
+      setPhase("done");
+    } catch {
+      setBankError("ไม่สามารถเชื่อมต่อระบบได้");
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  }
+
+  const qrImageSrc = qrCodeData
+    ? (qrCodeData.qrcode.startsWith("data:image/")
+      ? qrCodeData.qrcode
+      : `data:image/png;base64,${qrCodeData.qrcode}`)
+    : null;
+  const expiredTs = qrCodeData ? parseExpiredDateMs(qrCodeData.expired_date) : null;
+  const countdownSec = expiredTs ? Math.max(0, Math.floor((expiredTs - nowTs) / 1000)) : null;
+
+  useEffect(() => {
+    if (!qrCodeData) return;
+    const timer = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [qrCodeData]);
+
+  useEffect(() => {
+    if (method !== "payment" || phase !== "done") return;
+    if (!qrCodeData?.txid || countdownSec === null || countdownSec > 0) return;
+    if (expireDoneTxids[qrCodeData.txid]) return;
+
+    const txid = qrCodeData.txid;
+    setExpireDoneTxids((prev) => ({ ...prev, [txid]: true }));
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/smkpay/deposit/expire/${encodeURIComponent(txid)}`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          console.error("[deposit] expire request failed:", res.status);
+        }
+      } catch {
+        console.error("[deposit] expire request network error");
+      }
+    })();
+  }, [method, phase, qrCodeData, countdownSec, expireDoneTxids]);
+
+  useEffect(() => {
+    const txid = qrCodeData?.txid?.trim() ?? "";
+    if (method !== "payment" || phase !== "done" || !txid) return;
+    if (statusModal) return;
+    if (statusSettledTxids[txid]) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleNext = () => {
+      const delayMs = 10000 + Math.floor(Math.random() * 10001);
+      timer = setTimeout(pollStatus, delayMs);
+    };
+
+    const pollStatus = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(`/api/smkpay/deposit/status/${encodeURIComponent(txid)}`, {
+          method: "GET",
+        });
+
+        let payload: unknown = null;
+        try { payload = await res.json(); } catch {}
+        if (!res.ok) {
+          scheduleNext();
+          return;
+        }
+
+        const status = pickDepositStatus(payload);
+        if (isPaidLikeStatus(status)) {
+          setStatusSettledTxids((prev) => ({ ...prev, [txid]: true }));
+          setStatusModal({ kind: "success", message: "ชำระเงินสำเร็จ กำลังพากลับหน้าแรก..." });
+          return;
+        }
+
+        if (isExpiredStatus(status)) {
+          setStatusSettledTxids((prev) => ({ ...prev, [txid]: true }));
+          setStatusModal({ kind: "expired", message: "รายการหมดอายุ กำลังพากลับหน้าแรก..." });
+          return;
+        }
+      } catch {}
+
+      scheduleNext();
+    };
+
+    timer = setTimeout(pollStatus, 10000);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [method, phase, qrCodeData?.txid, statusModal, statusSettledTxids]);
+
+  useEffect(() => {
+    if (!statusModal) return;
+    const timer = setTimeout(() => {
+      window.location.href = `/${lang}`;
+    }, 2200);
+    return () => clearTimeout(timer);
+  }, [statusModal, lang]);
 
   return (
     <div className="max-w-5xl mx-auto px-5 pt-6">
@@ -405,7 +799,7 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
             )}
 
             {/* Bank account list */}
-            {!bankLoading && bankAccounts.length > 0 && (
+            {!bankLoading && method !== "payment" && bankAccounts.length > 0 && (
               <div className="space-y-2">
                 <p className="text-[14px] font-bold text-ap-secondary uppercase tracking-wide">
                   {method === "tw" ? "โอนมาที่หมายเลขนี้" : "โอนเงินมาที่บัญชีนี้"}
@@ -421,19 +815,105 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
               </div>
             )}
 
+            {/* Payment option list + amount input */}
+            {!bankLoading && method === "payment" && payments.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-[14px] font-bold text-ap-secondary uppercase tracking-wide">
+                  เลือกช่องทาง Payment
+                </p>
+                <div className="space-y-2">
+                  {payments.map((p) => {
+                    const active = selectedPayment?.id === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelectedPayment(p)}
+                        className={[
+                          "w-full text-left rounded-2xl border-2 p-4 transition-all",
+                          active
+                            ? "border-ap-blue bg-ap-blue/5 shadow-sm"
+                            : "border-ap-border hover:border-ap-blue/40 hover:bg-ap-bg",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-ap-bg border border-ap-border flex items-center justify-center text-[20px] flex-shrink-0">💳</div>
+                            <p className="text-[15px] font-bold text-ap-primary">{p.name}</p>
+                          </div>
+                          {p.min_deposit > 0 && (
+                            <span className="text-[13px] text-ap-tertiary">
+                              ขั้นต่ำ ฿{p.min_deposit.toLocaleString("en-US")}
+                            </span>
+                          )}
+                        </div>
+                        {p.remark && (
+                          <p className="text-[13px] text-amber-600 mt-2 bg-amber-50 rounded-lg px-2 py-1">{p.remark}</p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedPayment && (
+                  <div className="pt-1">
+                    <label className="block text-[14px] font-bold text-ap-secondary uppercase tracking-wide mb-1.5">
+                      จำนวนเงิน ({selectedPayment.name})
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] text-ap-tertiary pointer-events-none">฿</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={selectedPayment.min_deposit || 0}
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                        placeholder={String(selectedPayment.min_deposit || 0)}
+                        className="w-full rounded-2xl border-2 border-ap-border focus:border-ap-blue outline-none pl-9 pr-4 py-3 text-[16px] font-semibold text-ap-primary bg-white transition-colors"
+                      />
+                    </div>
+                    {selectedPayment.min_deposit > 0 && (
+                      <p className="text-[12px] text-ap-tertiary mt-1.5">
+                        ยอดฝากขั้นต่ำ ฿{selectedPayment.min_deposit.toLocaleString("en-US")}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-3 pt-1">
               <button
-                onClick={() => setPhase("method")}
+                onClick={() => {
+                  setPhase("method");
+                  setQrCodeData(null);
+                  setStatusModal(null);
+                }}
                 className="flex-1 py-3 rounded-full border-2 border-ap-border text-[14px] font-semibold text-ap-secondary hover:border-ap-blue/30 transition-colors"
               >
                 ← ย้อนกลับ
               </button>
               <button
-                onClick={() => setPhase("done")}
-                disabled={bankLoading || !!bankError || !selectedBank}
+                onClick={() => {
+                  if (method === "payment") {
+                    void createPaymentDeposit();
+                    return;
+                  }
+                  setPhase("done");
+                }}
+                disabled={
+                  bankLoading ||
+                  paymentSubmitting ||
+                  !!bankError ||
+                  (method === "payment"
+                    ? !selectedPayment ||
+                      !paymentAmount ||
+                      Number(paymentAmount) < (selectedPayment?.min_deposit ?? 0)
+                    : !selectedBank)
+                }
                 className="flex-1 py-3 rounded-2xl bg-ap-blue text-white text-[14px] font-semibold hover:bg-ap-blue-h transition-all disabled:opacity-40"
               >
-                ถัดไป
+                {method === "payment" && paymentSubmitting ? "กำลังส่ง..." : "ถัดไป"}
               </button>
             </div>
           </div>
@@ -442,23 +922,94 @@ export default function DepositPage({ displayName, bankName, bankAccount, balanc
         {/* ── Phase: done ───────────────────────────────────────────────────── */}
         {phase === "done" && (
           <div className="space-y-4 animate-fade-up">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-[16px] font-bold text-amber-700">รอ 1–3 นาที</p>
-              <p className="text-[13px] text-amber-700 mt-1">
-                ระบบกำลังตรวจสอบรายการฝากเงินของคุณ
-              </p>
-            </div>
+            {method === "payment" && qrCodeData && qrImageSrc ? (
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-ap-blue/20 bg-ap-blue/[0.03] p-4">
+                  <p className="text-[16px] font-bold text-ap-primary">สแกน QR เพื่อชำระเงิน</p>
+                  <p className="text-[13px] text-ap-secondary mt-1">
+                    กรุณาชำระภายในเวลาที่กำหนด และรอระบบตรวจสอบอัตโนมัติ
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-ap-border bg-white p-4">
+                  <div className="flex justify-center">
+                    <img
+                      src={qrImageSrc}
+                      alt="Deposit QR Code"
+                      className="w-full max-w-[320px] rounded-xl border border-ap-border bg-white p-2"
+                    />
+                  </div>
+                  <p className="mt-2 text-center text-[13px] font-semibold text-red-600">
+                    {countdownSec === null
+                      ? "ไม่พบเวลาหมดอายุ"
+                      : countdownSec > 0
+                        ? `หมดเวลาใน ${formatCountdown(countdownSec)}`
+                        : "QR หมดอายุแล้ว"}
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[13px]">
+                    <div className="rounded-xl bg-ap-bg px-3 py-2">
+                      <p className="text-ap-tertiary">Amount</p>
+                      <p className="font-bold text-ap-primary">
+                        ฿{Number(qrCodeData.amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                      <div className="rounded-xl bg-ap-bg px-3 py-2">
+                      <p className="text-ap-tertiary">หมดอายุ</p>
+                      <p className="font-semibold text-ap-primary">{qrCodeData.expired_date || "-"}</p>
+                    </div>
+                    <div className="rounded-xl bg-ap-bg px-3 py-2 sm:col-span-2">
+                      <p className="text-ap-tertiary">TXID</p>
+                      <p className="font-mono text-[12px] text-ap-primary break-all">{qrCodeData.txid || "-"}</p>
+                    </div>
+                    <div className="rounded-xl bg-ap-bg px-3 py-2 sm:col-span-2">
+                      <p className="text-ap-tertiary">Request ID</p>
+                      <p className="font-mono text-[12px] text-ap-primary break-all">{qrCodeData.request_id}</p>
+                    </div>
+                  
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-[16px] font-bold text-amber-700">รอ 1–3 นาที</p>
+                <p className="text-[13px] text-amber-700 mt-1">
+                  ระบบกำลังตรวจสอบรายการฝากเงินของคุณ
+                </p>
+              </div>
+            )}
             <a
               href={`/${lang}/transactions`}
               className="w-full flex items-center justify-center py-3 rounded-2xl bg-ap-blue text-white text-[14px] font-semibold hover:bg-ap-blue-h transition-colors"
             >
               ไปหน้า การเงิน
             </a>
+
           </div>
         )}
       </div>
 
       <Notes />
+
+      {statusModal && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center px-5">
+          <div className="w-full max-w-sm bg-white rounded-2xl border border-ap-border shadow-card p-5">
+            <p className="text-[17px] font-bold text-ap-primary">
+              {statusModal.kind === "success" ? "ฝากเงินสำเร็จ" : "รายการหมดอายุ"}
+            </p>
+            <p className="text-[14px] text-ap-secondary mt-2">
+              {statusModal.message}
+            </p>
+            <button
+              type="button"
+              onClick={() => { window.location.href = `/${lang}`; }}
+              className="mt-4 w-full py-3 rounded-2xl bg-ap-blue text-white text-[14px] font-semibold hover:bg-ap-blue-h transition-colors"
+            >
+              ไปหน้าแรก
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
