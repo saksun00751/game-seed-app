@@ -1,5 +1,6 @@
 import { Prompt } from "next/font/google";
 import "./globals.css";
+import { getTheme, themeToCssVars } from "@/lib/api/theme";
 
 const prompt = Prompt({
   subsets: ["thai", "latin"],
@@ -8,10 +9,13 @@ const prompt = Prompt({
   display: "swap",
 });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const theme = await getTheme();
+  const cssVars = themeToCssVars(theme) as React.CSSProperties;
+
   return (
-    <html className={prompt.variable}>
-      <body className="font-sans bg-ap-bg">{children}</body>
+    <html className={prompt.variable} style={cssVars}>
+      <body className="font-sans bg-page-bg">{children}</body>
     </html>
   );
 }

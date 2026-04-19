@@ -21,6 +21,9 @@ const config: Config = {
           green: "var(--ap-green)",
           orange: "var(--ap-orange)",
         },
+        "page-bg": "var(--page-bg)",
+        "navbar-bg": "var(--navbar-bg)",
+        "balance-card-bg": "var(--balance-card-bg)",
       },
       borderRadius: { "2xl": "18px", "3xl": "24px", "4xl": "32px" },
       boxShadow: {

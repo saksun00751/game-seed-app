@@ -72,7 +72,7 @@ export default function BalanceCard({ phone, displayName }: Props) {
   const liveDisplayName = user?.displayName ?? displayName;
 
   return (
-    <div className="bg-ap-blue rounded-3xl overflow-hidden relative">
+    <div className="bg-balance-card-bg rounded-3xl overflow-hidden relative">
       <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/5" />
       <div className="absolute -right-4 -bottom-10 w-32 h-32 rounded-full bg-white/5" />
 

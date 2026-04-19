@@ -8,6 +8,7 @@ import { logoutAction } from "@/lib/actions";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { useLang, type LangCode } from "@/lib/i18n/context";
 import { useUser } from "@/components/providers/UserProvider";
+import type { NavbarItem } from "@/lib/api/navbar";
 
 const LANGS: { code: LangCode; flag: string; label: string }[] = [
   { code: "th", flag: "🇹🇭", label: "ไทย" },
@@ -17,14 +18,15 @@ const LANGS: { code: LangCode; flag: string; label: string }[] = [
 ];
 
 interface NavbarProps {
-  logoUrl:   string;
-  balance:   number;
-  diamond:   number;
-  userName:  string;
-  userPhone: string;
+  logoUrl:         string;
+  balance:         number;
+  diamond:         number;
+  userName:        string;
+  userPhone:       string;
+  mobileNavItems?: NavbarItem[] | null;
 }
 
-export default function Navbar({ logoUrl, balance, diamond, userName, userPhone }: NavbarProps) {
+export default function Navbar({ logoUrl, balance, diamond, userName, userPhone, mobileNavItems }: NavbarProps) {
   const pathname = usePathname();
   const user = useUser();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -42,13 +44,22 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone 
     return () => document.removeEventListener("mousedown", onOutside);
   }, [profileOpen]);
 
-  const navLinks = [
-    { href: `/${lang}/dashboard`, label: t.home,    icon: "🏠" },
-    { href: `/${lang}/withdraw`,  label: t.withdraw, icon: "💸" },
-    { href: `/${lang}/bet`,       label: t.play,    icon: "🎯" },
-    { href: `/${lang}/history`,   label: t.history, icon: "📋" },
-    { href: `/${lang}/contact`,   label: t.contact,  icon: "💬" },
+  const fallbackNavLinks = [
+    { href: `/${lang}/dashboard`, label: t.home,     icon: "🏠", isCta: false },
+    { href: `/${lang}/withdraw`,  label: t.withdraw, icon: "💸", isCta: false },
+    { href: `/${lang}/bet`,       label: t.play,     icon: "🎯", isCta: true  },
+    { href: `/${lang}/history`,   label: t.history,  icon: "📋", isCta: false },
+    { href: `/${lang}/contact`,   label: t.contact,  icon: "💬", isCta: false },
   ];
+
+  const navLinks = mobileNavItems && mobileNavItems.length > 0
+    ? mobileNavItems.map((item) => ({
+        href:  `/${lang}${item.action_value.startsWith("/") ? item.action_value : `/${item.action_value}`}`,
+        label: item.label_i18n?.[lang] ?? item.label,
+        icon:  item.icon,
+        isCta: item.item_type === "center_cta",
+      }))
+    : fallbackNavLinks;
 
   const desktopNavLinks = [
     { href: `/${lang}/dashboard`, label: t.home,    icon: "🏠" },
@@ -79,7 +90,7 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone 
 
   return (
     <>
-      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-ap-border">
+      <nav className="sticky top-0 z-50 bg-navbar-bg backdrop-blur-xl border-b border-ap-border">
         <div className="max-w-5xl mx-auto px-3 sm:px-5 h-16 flex items-center justify-between gap-2">
 
           {/* Logo */}
@@ -260,7 +271,7 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone 
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${navLinks.length}, 1fr)` }}>
           {navLinks.map((l) => {
             const active = pathname === l.href || pathname.startsWith(l.href + "/");
-            const isPlay = l.href === `/${lang}/bet`;
+            const isPlay = l.isCta;
             return (
               <Link key={l.href} href={l.href}
                 className={[
