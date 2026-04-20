@@ -4,6 +4,7 @@ import ReferralPage from "@/components/referral/ReferralPage";
 import { requireAuth } from "@/lib/session/auth";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
 import { apiGet } from "@/lib/api/client";
+import { getRegisterPagePath } from "@/lib/config/register";
 
 export const metadata: Metadata = { title: "แนะนำเพื่อน — Lotto" };
 
@@ -76,7 +77,8 @@ export default async function ReferralRoute({ params }: Props) {
     referrals = referralRows;
   } catch {}
 
-  const referralLink = `${proto}://${host}/${locale}/register?ref=${encodeURIComponent(referralCode)}`;
+  const registerPath = getRegisterPagePath(locale);
+  const referralLink = `${proto}://${host}${registerPath}?ref=${encodeURIComponent(referralCode)}`;
 
   return (
     <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">

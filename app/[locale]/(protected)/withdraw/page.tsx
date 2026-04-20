@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import WithdrawPage from "@/components/withdraw/WithdrawPage";
-import { requireAuth } from "@/lib/session/auth";
 import { apiGet } from "@/lib/api/client";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
+import { getBanks } from "@/lib/api/banks";
 
 export const metadata: Metadata = { title: "ถอนเงิน — Lotto" };
 
@@ -28,38 +28,51 @@ interface LoadBalanceResponse {
   };
 }
 
-interface ApiBankItem {
-  code:      number;
-  name_th:   string;
-  shortcode: string;
-  image_url: string;
-}
-
-interface BanksResponse {
-  data?: { banks?: ApiBankItem[] };
+interface MemberProfileResponse {
+  success?: boolean;
+  profile?: {
+    getpro?: boolean;
+    pro?: boolean;
+    pro_name?: string;
+    amount_balance?: string | number;
+    withdraw_limit_amount?: string | number;
+  };
 }
 
 export default async function WithdrawRoute() {
-  await requireAuth();
   const [token, lang] = await Promise.all([getApiToken(), getLangCookie()]);
 
   let profile: LoadBalanceProfile | null = null;
   let canWithdraw = true;
   let notice: string | null = null;
+  let promoActive = false;
+  let promoName: string | null = null;
+  let promoTurnover = 0;
+  let promoWithdrawLimit = 0;
 
   try {
-    const res = await apiGet<LoadBalanceResponse>("/member/loadbalance", token ?? undefined, lang);
-    profile     = res.profile;
-    canWithdraw = res.withdraw;
-    notice      = res.system?.notice ?? null;
+    const [loadBalanceRes, memberProfileRes] = await Promise.all([
+      apiGet<LoadBalanceResponse>("/member/loadbalance", token ?? undefined, lang),
+      apiGet<MemberProfileResponse>("/member/profile", token ?? undefined, lang),
+    ]);
+    profile = loadBalanceRes.profile;
+    canWithdraw = loadBalanceRes.withdraw;
+    notice = loadBalanceRes.system?.notice ?? null;
+
+    const profilePromo = memberProfileRes?.profile;
+    promoActive = Boolean(profilePromo?.getpro && profilePromo?.pro);
+    promoName = typeof profilePromo?.pro_name === "string" ? profilePromo.pro_name : null;
+    promoTurnover = Number(profilePromo?.amount_balance ?? 0) || 0;
+    promoWithdrawLimit = Number(profilePromo?.withdraw_limit_amount ?? profile?.withdraw_limit_amount ?? 0) || 0;
   } catch {}
 
   let bankName: string | null = null;
+  let bankLogo: string | null = null;
   if (profile?.bank_code) {
-    try {
-      const res = await apiGet<BanksResponse>("/auth/register/banks");
-      bankName = res.data?.banks?.find((b) => b.code === profile!.bank_code)?.name_th ?? null;
-    } catch {}
+    const banks = await getBanks();
+    const bank = banks.find((b) => b.code === profile.bank_code);
+    bankName = bank?.name_th ?? null;
+    bankLogo = bank?.image_url ?? null;
   }
 
   return (
@@ -67,6 +80,7 @@ export default async function WithdrawRoute() {
       <WithdrawPage
         displayName={profile?.name ?? "สมาชิก"}
         bankName={bankName}
+        bankLogo={bankLogo}
         bankAccount={profile?.acc_no ?? null}
         balance={parseFloat(profile?.balance ?? "0")}
         withdrawMin={parseFloat(profile?.withdraw_min ?? "100")}
@@ -77,6 +91,10 @@ export default async function WithdrawRoute() {
         withdrawLimitAmount={parseFloat(profile?.withdraw_limit_amount ?? "0")}
         canWithdraw={canWithdraw}
         notice={notice}
+        promoActive={promoActive}
+        promoName={promoName}
+        promoTurnover={promoTurnover}
+        promoWithdrawLimit={promoWithdrawLimit}
       />
     </div>
   );

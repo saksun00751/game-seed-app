@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import DepositPage from "@/components/deposit/DepositPage";
-import { requireAuth } from "@/lib/session/auth";
 import { apiGet } from "@/lib/api/client";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
+import { getBanks } from "@/lib/api/banks";
 
 export const metadata: Metadata = { title: "เติมเงิน — Lotto" };
 
@@ -25,19 +25,7 @@ interface LoadBalanceResponse {
   promotion?: LoadBalancePromotion | null;
 }
 
-interface ApiBankItem {
-  code:      number;
-  name_th:   string;
-  shortcode: string;
-  image_url: string;
-}
-
-interface BanksResponse {
-  data?: { banks?: ApiBankItem[] };
-}
-
 export default async function DepositRoute() {
-  await requireAuth();
   const [token, lang] = await Promise.all([getApiToken(), getLangCookie()]);
 
   let profile: LoadBalanceProfile | null = null;
@@ -49,11 +37,12 @@ export default async function DepositRoute() {
   } catch {}
 
   let bankName: string | null = null;
+  let bankLogo: string | null = null;
   if (profile?.bank_code) {
-    try {
-      const res = await apiGet<BanksResponse>("/auth/register/banks");
-      bankName = res.data?.banks?.find((b) => b.code === profile!.bank_code)?.name_th ?? null;
-    } catch {}
+    const banks = await getBanks();
+    const bank = banks.find((b) => b.code === profile.bank_code);
+    bankName = bank?.name_th ?? null;
+    bankLogo = bank?.image_url ?? null;
   }
 
   return (
@@ -61,6 +50,7 @@ export default async function DepositRoute() {
       <DepositPage
         displayName={profile?.name ?? "สมาชิก"}
         bankName={bankName}
+        bankLogo={bankLogo}
         bankAccount={profile?.acc_no ?? null}
         balance={parseFloat(profile?.balance ?? "0")}
         selectedPromotion={selectedPromotion?.select ? selectedPromotion : null}

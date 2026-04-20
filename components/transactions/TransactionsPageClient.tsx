@@ -218,7 +218,7 @@ export default function TransactionsPageClient({ locale }: { locale: string; api
                   : "bg-white text-ap-secondary border-ap-border hover:bg-ap-bg",
               ].join(" ")}
             >
-              <span>{TAB_ICONS[id]}</span>
+              <span className="emoji-font">{TAB_ICONS[id]}</span>
               <span>{TAB_LABELS[id]}</span>
             </button>
           ))}
@@ -251,9 +251,9 @@ export default function TransactionsPageClient({ locale }: { locale: string; api
 
         {/* List */}
         <div className="bg-white rounded-2xl border border-ap-border shadow-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-ap-border flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-ap-border flex items-center justify-between bg-slate-100/70">
             <div className="flex items-center gap-2">
-              <span className="text-[18px]">{TAB_ICONS[tabId]}</span>
+              <span className="text-[18px] emoji-font">{TAB_ICONS[tabId]}</span>
               <span className="text-[14px] font-bold text-ap-primary">{TAB_LABELS[tabId]}</span>
             </div>
             <span className="text-[12px] text-ap-tertiary tabular-nums">

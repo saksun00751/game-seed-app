@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireAuth } from "@/lib/session/auth";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
 import { apiGet } from "@/lib/api/client";
 import { getTranslation } from "@/lib/i18n/getTranslation";
@@ -60,9 +59,8 @@ interface Props {
 }
 
 export default async function HistoryPage({ params, searchParams }: Props) {
-  const [{ locale }, , apiToken, lang, sp] = await Promise.all([
+  const [{ locale }, apiToken, lang, sp] = await Promise.all([
     params ?? Promise.resolve({ locale: "th" }),
-    requireAuth(),
     getApiToken(),
     getLangCookie(),
     searchParams,

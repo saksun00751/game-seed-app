@@ -57,6 +57,7 @@ export default function PackageModalButton({
   const [selecting, setSelecting] = useState(false);
   const [expired,   setExpired]   = useState(false);
   const [toastMsg,  setToastMsg]  = useState<{ text: string; type: "warning" | "error" } | null>(null);
+  const playLabel = labelPlay.replace(/\s*→\s*$/g, "").replace(/\s+/g, " ").trim();
 
   useEffect(() => {
     if (!closeAt) return;
@@ -135,12 +136,16 @@ export default function PackageModalButton({
       <button
         onClick={handleOpen}
         disabled={loading}
-        className="flex items-center justify-center gap-1.5 w-full bg-ap-blue text-white rounded-full py-2 text-[12px] font-semibold hover:bg-ap-blue-h transition-colors active:scale-95 disabled:opacity-70"
+        className="inline-flex h-[34px] items-center justify-center gap-1.5 whitespace-nowrap w-full bg-gradient-to-r from-[#0066d1] via-[#0a79de] to-[#1895f3] text-white rounded-full px-4 text-[13px] font-bold border border-sky-200/50 hover:brightness-105 transition-all active:scale-95 disabled:opacity-70 shadow-md"
       >
         {loading && (
           <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
         )}
-        {labelPlay}
+        <span className="leading-none">{playLabel}</span>
+        <svg className="w-3.5 h-3.5 text-white/90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+          <path d="M5 12h14" />
+          <path d="M13 6l6 6-6 6" />
+        </svg>
       </button>
 
       {/* Modal — portal to body to escape parent transform stacking context */}

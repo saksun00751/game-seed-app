@@ -7,11 +7,11 @@ import type { BetSlipDetail } from "@/lib/types/bet";
 import BetSlipDetailModal from "./BetSlipDetailModal";
 
 const STATUS_STYLE: Record<string, string> = {
-  active:    "bg-ap-blue/10 text-ap-blue",
-  won:       "bg-green-50 text-green-700",
-  lost:      "bg-red-50 text-red-600",
-  pending:   "bg-yellow-50 text-yellow-700",
-  cancelled: "bg-ap-bg text-ap-tertiary",
+  active:    "bg-blue-100 text-blue-800 border border-blue-200",
+  won:       "bg-emerald-100 text-emerald-800 border border-emerald-200",
+  lost:      "bg-rose-100 text-rose-800 border border-rose-200",
+  pending:   "bg-amber-100 text-amber-800 border border-amber-200",
+  cancelled: "bg-slate-100 text-slate-700 border border-slate-200",
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://api.huayinter88.com";
@@ -79,7 +79,7 @@ export default function TicketList({ tickets, t }: { tickets: Ticket[]; t: T }) 
             key={ticket.id}
             onClick={() => openDetail(ticket.id)}
             disabled={!!loading}
-            className={`w-full text-left px-4 py-4 flex items-center gap-3 transition-colors disabled:opacity-60 ${ticket.status === "won" ? "bg-green-50 hover:bg-green-100/80 active:bg-green-100" : "hover:bg-ap-bg/60 active:bg-ap-bg"}`}
+            className={`w-full text-left px-4 py-4 flex items-center gap-3 transition-colors disabled:opacity-60 ${ticket.status === "won" ? "bg-emerald-50 hover:bg-emerald-100/80 active:bg-emerald-100" : "hover:bg-ap-bg/70 active:bg-ap-bg"}`}
           >
             {/* Logo */}
             <div className="w-10 h-10 rounded-xl border border-ap-border bg-ap-bg flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -94,10 +94,10 @@ export default function TicketList({ tickets, t }: { tickets: Ticket[]; t: T }) 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <span className="text-[14px] font-bold text-ap-primary truncate">{ticket.market_name}</span>
-                <span
-                  title={ticket.cancel_reason ?? ticket.result_message ?? undefined}
-                  className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLE[ticket.status] ?? "bg-ap-bg text-ap-secondary"}`}
-                >
+                  <span
+                    title={ticket.cancel_reason ?? ticket.result_message ?? undefined}
+                    className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLE[ticket.status] ?? "bg-slate-100 text-slate-700 border border-slate-200"}`}
+                  >
                   {statusLabel}
                 </span>
               </div>

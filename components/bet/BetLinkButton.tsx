@@ -22,6 +22,7 @@ export default function BetLinkButton({
   const router = useRouter();
   const [toast,   setToast]   = useState(false);
   const [expired, setExpired] = useState(false);
+  const playLabel = labelPlay.replace(/\s*→\s*$/g, "").replace(/\s+/g, " ").trim();
 
   useEffect(() => {
     if (!closeAt) return;
@@ -56,9 +57,13 @@ export default function BetLinkButton({
     <>
       <button
         onClick={handleClick}
-        className="block w-full text-center bg-ap-blue text-white rounded-full py-2 text-[12px] font-semibold hover:bg-ap-blue-h transition-colors active:scale-95"
+        className="inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap bg-ap-blue text-white rounded-full py-2 text-[12px] font-semibold hover:bg-ap-blue-h transition-colors active:scale-95"
       >
-        {labelPlay}
+        <span className="leading-none">{playLabel}</span>
+        <svg className="w-3.5 h-3.5 text-white/90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+          <path d="M5 12h14" />
+          <path d="M13 6l6 6-6 6" />
+        </svg>
       </button>
 
       {toast && (

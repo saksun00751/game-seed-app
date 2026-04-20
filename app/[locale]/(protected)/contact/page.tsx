@@ -1,24 +1,9 @@
 import type { Metadata } from "next";
-import Navbar from "@/components/layout/NavbarServer";
-import { requireAuth } from "@/lib/session/auth";
-import { apiGet } from "@/lib/api/client";
-import { getApiToken, getLangCookie } from "@/lib/session/cookies";
+import { getLangCookie } from "@/lib/session/cookies";
 import { getTranslation } from "@/lib/i18n/getTranslation";
+import { getContactChannels, type ContactChannel } from "@/lib/api/contact-channels";
 
 export const metadata: Metadata = { title: "ติดต่อเรา — Lotto" };
-
-interface ContactChannel {
-  code:  number;
-  type:  string;
-  label: string;
-  link:  string;
-  sort:  number;
-}
-
-interface ContactChannelsResponse {
-  success: boolean;
-  data: { contact_channels: ContactChannel[] };
-}
 
 function getChannelMeta(type: string, t: ReturnType<typeof getTranslation<"contact">>) {
   if (type === "line") return {
@@ -57,19 +42,16 @@ function getChannelMeta(type: string, t: ReturnType<typeof getTranslation<"conta
 }
 
 export default async function ContactPage() {
-  await requireAuth();
-  const [token, lang] = await Promise.all([getApiToken(), getLangCookie()]);
+  const lang = await getLangCookie();
   const t = getTranslation(lang, "contact");
 
   let channels: ContactChannel[] = [];
   try {
-    const res = await apiGet<ContactChannelsResponse>("/meta/contact-channels", token ?? undefined);
-    channels = (res.data?.contact_channels ?? []).sort((a, b) => a.sort - b.sort);
+    channels = await getContactChannels(lang);
   } catch {}
 
   return (
     <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">
-      <Navbar />
       <div className="max-w-5xl mx-auto px-5 pt-6 space-y-6">
 
         {/* Header */}

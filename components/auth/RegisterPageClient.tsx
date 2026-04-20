@@ -7,12 +7,15 @@ import RegisterForm, { BankOption } from "@/components/auth/RegisterForm";
 import LanguageSwitcher from "@/components/auth/LanguageSwitcher";
 
 interface Props {
+  initialLang: string;
   defaultRef: string;
   banks:      BankOption[];
   logoUrl:    string;
 }
 
-function RegisterContent({ defaultRef, banks, logoUrl }: Props) {
+type RegisterContentProps = Omit<Props, "initialLang">;
+
+function RegisterContent({ defaultRef, banks, logoUrl }: RegisterContentProps) {
   const t = useTranslation("register");
 
   return (
@@ -73,9 +76,9 @@ function RegisterContent({ defaultRef, banks, logoUrl }: Props) {
   );
 }
 
-export default function RegisterPageClient({ defaultRef, banks, logoUrl }: Props) {
+export default function RegisterPageClient({ initialLang, defaultRef, banks, logoUrl }: Props) {
   return (
-    <LangProvider>
+    <LangProvider initialLang={initialLang}>
       <RegisterContent defaultRef={defaultRef} banks={banks} logoUrl={logoUrl} />
     </LangProvider>
   );

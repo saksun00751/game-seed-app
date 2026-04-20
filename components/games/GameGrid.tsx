@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "@/lib/i18n/useTranslation";
+import { toast } from "sonner";
 
 function getBrowserName(): string {
   const ua = navigator.userAgent;
@@ -54,10 +55,10 @@ export default function GameGrid({ games, emoji, notFound }: Props) {
       if (data.url) {
         openGameUrl(data.url);
       } else {
-        alert(data.error ?? t.errCannotPlay);
+        toast.error(data.error ?? t.errCannotPlay);
       }
     } catch {
-      alert(t.errGeneric);
+      toast.error(t.errGeneric);
     } finally {
       setLoading(null);
     }

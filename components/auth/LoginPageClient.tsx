@@ -1,13 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import Image from "next/image";
-import { LangProvider } from "@/lib/i18n/context";
+import { LangProvider, useLang } from "@/lib/i18n/context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import LoginForm from "@/components/auth/LoginForm";
 import LanguageSwitcher from "@/components/auth/LanguageSwitcher";
 
 function LoginContent({ logoUrl }: { logoUrl: string }) {
   const t = useTranslation("login");
+  const { lang } = useLang();
 
   return (
     <div className="relative w-full max-w-[400px] animate-fade-up">
@@ -36,13 +38,13 @@ function LoginContent({ logoUrl }: { logoUrl: string }) {
       {/* Footer */}
       <p className="text-center text-[11.5px] text-ap-tertiary mt-5 leading-relaxed">
         {t.terms}{" "}
-        <a href="#" className="underline hover:text-ap-secondary transition-colors">
+        <Link href={`/${lang}/contact-public`} className="underline hover:text-ap-secondary transition-colors">
           {t.termsLink}
-        </a>{" "}
+        </Link>{" "}
         {t.and}{" "}
-        <a href="#" className="underline hover:text-ap-secondary transition-colors">
+        <Link href={`/${lang}/contact-public`} className="underline hover:text-ap-secondary transition-colors">
           {t.privacyLink}
-        </a>
+        </Link>
       </p>
     </div>
   );

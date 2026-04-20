@@ -3,7 +3,6 @@ import PackageModalButton from "@/components/bet/PackageModalButton";
 import BetToastNotice from "@/components/bet/BetToastNotice";
 import BackButton from "@/components/ui/BackButton";
 import { notFound } from "next/navigation";
-import { requireAuth } from "@/lib/session/auth";
 import type { Metadata } from "next";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
 import { apiGet } from "@/lib/api/client";
@@ -11,6 +10,7 @@ import { mapMarketsToCategories } from "@/lib/api/lotto";
 import type { MarketsLatestResponse } from "@/lib/api/lotto";
 import { getTranslation } from "@/lib/i18n/getTranslation";
 import type { Category, SubItem } from "@/lib/categories";
+import { Suspense } from "react";
 
 interface Props {
   params: Promise<{ locale: string; id: string }>;
@@ -134,8 +134,7 @@ function ComingSoon({ emoji, label, t }: { emoji: string; label: string; t: Cate
 export default async function CategoryPage({ params }: Props) {
   const { locale, id } = await params;
 
-  const [, apiToken, lang] = await Promise.all([
-    requireAuth(),
+  const [apiToken, lang] = await Promise.all([
     getApiToken(),
     getLangCookie(),
   ]);
@@ -159,7 +158,9 @@ export default async function CategoryPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">
-      <BetToastNotice />
+      <Suspense fallback={null}>
+        <BetToastNotice />
+      </Suspense>
       <div className="max-w-5xl mx-auto px-5 pt-6">
 
         {/* Back + header */}

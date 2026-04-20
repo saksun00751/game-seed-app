@@ -5,18 +5,9 @@ import { logoutAction } from "@/lib/actions";
 import { apiGet } from "@/lib/api/client";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
 import { getTranslation } from "@/lib/i18n/getTranslation";
+import { getBanks, type ApiBankItem } from "@/lib/api/banks";
 
 export const metadata: Metadata = { title: "ข้อมูลสมาชิก — Lotto" };
-
-interface ApiBankItem {
-  code:      number;
-  name_th:   string;
-  shortcode: string;
-  image_url: string;
-}
-interface BanksResponse {
-  data?: { banks?: ApiBankItem[] };
-}
 
 interface LoadBalanceProfile {
   name:     string;
@@ -56,16 +47,14 @@ export default async function ProfilePage({ params }: Props) {
   let accNo:       string | null = null;
   let accName:     string | null = null;
 
-  const [banksRes, loadbalanceRes] = await Promise.allSettled([
-    apiGet<BanksResponse>("/auth/register/banks"),
+  const [banksRes, loadbalanceRes] = await Promise.all([
+    getBanks(),
     apiGet<LoadBalanceResponse>("/member/loadbalance", apiToken ?? undefined, lang),
   ]);
 
-  if (banksRes.status === "fulfilled" && banksRes.value?.data?.banks) {
-    bankOptions = banksRes.value.data.banks;
-  }
-  if (loadbalanceRes.status === "fulfilled" && loadbalanceRes.value?.profile) {
-    const p = loadbalanceRes.value.profile;
+  bankOptions = banksRes;
+  if (loadbalanceRes?.profile) {
+    const p = loadbalanceRes.profile;
     accNo    = p.acc_no   || null;
     accName  = p.name     || null;
     bankName = bankOptions.find((b) => b.code === p.bank_code)?.name_th ?? null;

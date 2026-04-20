@@ -124,7 +124,7 @@ export interface LoginPasswordState {
   error?: string;
   fieldErrors?: { user_name?: string; password?: string };
   success?: boolean;
-  phone?: string;
+  username?: string;
 }
 
 export async function loginWithPasswordAction(
@@ -133,12 +133,11 @@ export async function loginWithPasswordAction(
 ): Promise<LoginPasswordState> {
   const lang     = getLang(formData);
   const t        = locales[lang].login;
-  const phone    = normalizePhone((formData.get("user_name") as string) ?? "");
+  const username = ((formData.get("user_name") as string) ?? "").trim();
   const password = (formData.get("password") as string) ?? "";
 
   const fieldErrors: LoginPasswordState["fieldErrors"] = {};
-  if (!phone)                        fieldErrors.user_name = t.errPhone;
-  else if (!isValidThaiPhone(phone)) fieldErrors.user_name = t.errPhoneInvalid;
+  if (!username)                     fieldErrors.user_name = (t as Record<string, string>).errUsername ?? t.errPhone;
   if (!password)                     fieldErrors.password  = t.errPassword;
   if (Object.keys(fieldErrors).length) return { fieldErrors };
 
@@ -149,7 +148,7 @@ export async function loginWithPasswordAction(
   let apiToken: string | undefined;
   let memberCode: number | undefined;
   try {
-    const res = await apiPost<LoginRes>("/auth/login", { user_name: phone, password }, undefined, lang);
+    const res = await apiPost<LoginRes>("/auth/login", { user_name: username, password }, undefined, lang);
     apiToken   = res.access_token;
     memberCode = res.member?.code;
   } catch (e) {
@@ -253,6 +252,107 @@ export async function registerAction(
   try {
     interface LoginRes { access_token?: string; member?: { code?: number } }
     const res = await apiPost<LoginRes>("/auth/login", { user_name: phone, password }, undefined, lang);
+    if (res.access_token)  await setApiTokenCookie(res.access_token);
+    if (res.member?.code)  await setMemberCodeCookie(res.member.code);
+  } catch {}
+
+  redirect(`/${lang}/dashboard`);
+}
+
+// ─── Register with Username ───────────────────────────────────────────────────
+const USERNAME_RE = /^[a-z0-9]{5,10}$/;
+
+export async function registerWithUsernameAction(
+  _prevState: RegisterState,
+  formData: FormData
+): Promise<RegisterState> {
+  const lang            = getLang(formData);
+  const t               = locales[lang].register;
+  const username        = ((formData.get("user_name")      as string) ?? "").trim().toLowerCase();
+  const tel             = normalizePhone((formData.get("tel")         as string) ?? "");
+  const password        = (formData.get("password")        as string) ?? "";
+  const confirmPassword = (formData.get("confirmPassword") as string) ?? "";
+  const firstname       = ((formData.get("firstname")      as string) ?? "").trim();
+  const lastname        = ((formData.get("lastname")       as string) ?? "").trim();
+  const accNo           = ((formData.get("acc_no")         as string) ?? "").replace(/\D/g, "");
+  const bankRaw         = (formData.get("bank")            as string) ?? "";
+  const bank            = parseInt(bankRaw, 10);
+  const referRaw        = ((formData.get("referralCode")   as string) ?? "").trim();
+  const marketRaw       = ((formData.get("marketing")      as string) ?? "").trim();
+
+  const fieldErrors: RegisterState["fieldErrors"] = {};
+  if (!username)                     fieldErrors.user_name = "กรุณากรอกชื่อผู้ใช้";
+  else if (!USERNAME_RE.test(username) || !/[a-z]/.test(username))
+                                     fieldErrors.user_name = "ชื่อผู้ใช้ต้องเป็นอังกฤษพิมพ์เล็ก/ตัวเลข 5–10 ตัว และมีตัวอักษรอย่างน้อย 1 ตัว";
+  else if (isValidThaiPhone(username))
+                                     fieldErrors.user_name = "ชื่อผู้ใช้ต้องไม่เป็นเบอร์โทร";
+  if (!tel)                          fieldErrors.tel       = t.errPhone;
+  else if (!isValidThaiPhone(tel))   fieldErrors.tel       = t.errPhoneInvalid;
+  if (!password)                                              fieldErrors.password = t.errPassword;
+  else if (password.length < 6 || password.length > 10)      fieldErrors.password = t.errPasswordLen;
+  if (!confirmPassword)                  fieldErrors.confirmPassword = t.errConfirmPassword;
+  else if (confirmPassword !== password) fieldErrors.confirmPassword = t.confirmMismatch;
+  if (!firstname)                      fieldErrors.firstname = t.errFirstname;
+  if (!lastname)                       fieldErrors.lastname  = t.errLastname;
+  if (!bankRaw || isNaN(bank))         fieldErrors.bank      = t.errBank;
+  if (!accNo)                          fieldErrors.acc_no    = t.errAccNo;
+  else if (accNo.length < 10 || accNo.length > 12) fieldErrors.acc_no = t.errAccNoLen;
+  if (Object.keys(fieldErrors).length) return { fieldErrors };
+
+  function safeMsg(msg: string | undefined, fallback: string): string {
+    if (!msg) return fallback;
+    const trimmed = msg.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) return fallback;
+    return msg;
+  }
+
+  const registerPayload = {
+    user_name: username,
+    tel,
+    password,
+    password_confirm: confirmPassword,
+    name: `${firstname} ${lastname}`.trim(),
+    acc_no: accNo,
+    bank,
+    refer: 1,
+    ...(referRaw  ? { referral_code: referRaw  } : {}),
+    ...(marketRaw ? { marketing:     marketRaw } : {}),
+  };
+  try {
+    await apiPost("/auth/register-with-username", registerPayload, undefined, lang);
+  } catch (e) {
+    if (e instanceof ApiError) {
+      const payloadFieldErrors = parseRegisterFieldErrorsFromApi(e.payload);
+
+      const duplicateFields: string[] =
+        (e.payload as Record<string, unknown>)?.duplicate_fields as string[] ?? [];
+      if (duplicateFields.includes("user_name") && !payloadFieldErrors.user_name)
+        payloadFieldErrors.user_name = "ชื่อผู้ใช้นี้ถูกใช้งานแล้ว";
+      if (duplicateFields.includes("tel") && !payloadFieldErrors.tel)
+        payloadFieldErrors.tel = t.errPhoneExists;
+      if (duplicateFields.includes("acc_no") && !payloadFieldErrors.acc_no)
+        payloadFieldErrors.acc_no =
+          (t as Record<string, string>).errAccNoDuplicate ?? "เลขบัญชีนี้ถูกใช้งานแล้วในธนาคารที่เลือก";
+
+      if (Object.values(payloadFieldErrors).some(Boolean)) {
+        return {
+          error: safeMsg(e.message, "สมัครสมาชิกไม่สำเร็จ กรุณาลองใหม่"),
+          fieldErrors: payloadFieldErrors,
+        };
+      }
+
+      const msg = (e.message ?? "").toLowerCase();
+      if (e.status === 409 || msg.includes("exist"))
+        return { fieldErrors: { user_name: "ชื่อผู้ใช้นี้ถูกใช้งานแล้ว" } };
+
+      return { error: safeMsg(e.message, "สมัครสมาชิกไม่สำเร็จ กรุณาลองใหม่") };
+    }
+    return { error: "ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่" };
+  }
+
+  try {
+    interface LoginRes { access_token?: string; member?: { code?: number } }
+    const res = await apiPost<LoginRes>("/auth/login", { user_name: username, password }, undefined, lang);
     if (res.access_token)  await setApiTokenCookie(res.access_token);
     if (res.member?.code)  await setMemberCodeCookie(res.member.code);
   } catch {}

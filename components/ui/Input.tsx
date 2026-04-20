@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, ReactNode } from "react";
+import { InputHTMLAttributes, ReactNode, useId } from "react";
 
 interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "className"> {
   label?: ReactNode;
@@ -9,10 +9,14 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "classN
 }
 
 export default function Input({ label, error, hint, leftEl, rightEl, ...props }: InputProps) {
+  const autoId = useId();
+  const inputId = props.id ?? `input-${autoId}`;
+  const describedBy = error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined;
+
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-[13px] font-semibold text-ap-secondary">
+        <label htmlFor={inputId} className="text-[13px] font-semibold text-ap-secondary">
           {label}
         </label>
       )}
@@ -24,6 +28,9 @@ export default function Input({ label, error, hint, leftEl, rightEl, ...props }:
         )}
         <input
           {...props}
+          id={inputId}
+          aria-invalid={Boolean(error)}
+          aria-describedby={describedBy}
           className={[
             "w-full rounded-2xl border bg-ap-bg text-[15px] text-ap-primary placeholder:text-ap-tertiary",
             "py-3 transition-all outline-none",
@@ -41,10 +48,10 @@ export default function Input({ label, error, hint, leftEl, rightEl, ...props }:
         )}
       </div>
       {error && (
-        <p className="text-[12px] text-ap-red">{error}</p>
+        <p id={`${inputId}-error`} role="alert" className="text-[12px] text-ap-red">{error}</p>
       )}
       {!error && hint && (
-        <p className="text-[12px] text-ap-tertiary">{hint}</p>
+        <p id={`${inputId}-hint`} className="text-[12px] text-ap-tertiary">{hint}</p>
       )}
     </div>
   );

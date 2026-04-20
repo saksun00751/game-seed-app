@@ -14,7 +14,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cssVars = themeToCssVars(theme) as React.CSSProperties;
 
   return (
-    <html className={prompt.variable} style={cssVars}>
+    <html lang="th" className={prompt.variable} style={cssVars}>
       <body className="font-sans bg-page-bg">{children}</body>
     </html>
   );

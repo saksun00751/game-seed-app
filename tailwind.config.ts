@@ -5,7 +5,18 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-prompt)", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        sans: [
+          "var(--font-prompt)",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "Arial",
+          "sans-serif",
+          "Apple Color Emoji",
+          "Segoe UI Emoji",
+          "Noto Color Emoji",
+        ],
       },
       colors: {
         ap: {

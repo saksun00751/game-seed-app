@@ -1,22 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { apiGet } from "@/lib/api/client";
+import { getContactChannels, type ContactChannel } from "@/lib/api/contact-channels";
 import { getTranslation } from "@/lib/i18n/getTranslation";
 
 export const metadata: Metadata = { title: "ติดต่อเรา — Lotto" };
-
-interface ContactChannel {
-  code: number;
-  type: string;
-  label: string;
-  link: string;
-  sort: number;
-}
-
-interface ContactChannelsResponse {
-  success: boolean;
-  data: { contact_channels: ContactChannel[] };
-}
 
 function getChannelMeta(type: string, t: ReturnType<typeof getTranslation<"contact">>) {
   if (type === "line") return {
@@ -65,8 +52,7 @@ export default async function ContactPublicPage({
 
   let channels: ContactChannel[] = [];
   try {
-    const res = await apiGet<ContactChannelsResponse>("/meta/contact-channels", undefined, locale);
-    channels = (res.data?.contact_channels ?? []).sort((a, b) => a.sort - b.sort);
+    channels = await getContactChannels(locale);
   } catch {}
 
   return (

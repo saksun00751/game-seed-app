@@ -10,11 +10,11 @@ import { useLang, type LangCode } from "@/lib/i18n/context";
 import { useUser } from "@/components/providers/UserProvider";
 import type { NavbarItem } from "@/lib/api/navbar";
 
-const LANGS: { code: LangCode; flag: string; label: string }[] = [
-  { code: "th", flag: "🇹🇭", label: "ไทย" },
-  { code: "en", flag: "🇬🇧", label: "EN" },
-  { code: "kh", flag: "🇰🇭", label: "ខ្មែរ" },
-  { code: "la", flag: "🇱🇦", label: "ລາວ" },
+const LANGS: { code: LangCode; flag: string; flagIcon: string; label: string }[] = [
+  { code: "th", flag: "🇹🇭", flagIcon: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f1f9-1f1ed.svg", label: "ไทย" },
+  { code: "en", flag: "🇬🇧", flagIcon: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f1ec-1f1e7.svg", label: "EN" },
+  { code: "kh", flag: "🇰🇭", flagIcon: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f1f0-1f1ed.svg", label: "ខ្មែរ" },
+  { code: "la", flag: "🇱🇦", flagIcon: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f1f1-1f1e6.svg", label: "ລາວ" },
 ];
 
 interface NavbarProps {
@@ -24,6 +24,94 @@ interface NavbarProps {
   userName:        string;
   userPhone:       string;
   mobileNavItems?: NavbarItem[] | null;
+}
+
+type IconName =
+  | "home"
+  | "withdraw"
+  | "play"
+  | "history"
+  | "contact"
+  | "profile"
+  | "referral"
+  | "promotion"
+  | "finance"
+  | "check-result"
+  | "password"
+  | "spin"
+  | "coupon"
+  | "bonus"
+  | "reward"
+  | "logout"
+  | "deposit"
+  | "diamond";
+
+function iconForPath(path: string): IconName {
+  if (path.includes("/withdraw")) return "withdraw";
+  if (path.includes("/bet")) return "play";
+  if (path.includes("/history")) return "history";
+  if (path.includes("/contact")) return "contact";
+  if (path.includes("/profile")) return "profile";
+  if (path.includes("/referral")) return "referral";
+  if (path.includes("/promotion")) return "promotion";
+  if (path.includes("/transactions")) return "finance";
+  if (path.includes("/check-result")) return "check-result";
+  if (path.includes("/change-password")) return "password";
+  if (path.includes("/spin")) return "spin";
+  if (path.includes("/coupon")) return "coupon";
+  if (path.includes("/bonus")) return "bonus";
+  if (path.includes("/reward")) return "reward";
+  if (path.includes("/deposit")) return "deposit";
+  return "home";
+}
+
+function normalizeIcon(raw: string | null | undefined, path?: string): IconName {
+  const value = (raw ?? "").toLowerCase();
+  if (value.includes("home") || value.includes("house")) return "home";
+  if (value.includes("withdraw")) return "withdraw";
+  if (value.includes("bet") || value.includes("target") || value.includes("play")) return "play";
+  if (value.includes("history") || value.includes("list")) return "history";
+  if (value.includes("contact") || value.includes("chat")) return "contact";
+  if (value.includes("profile") || value.includes("user")) return "profile";
+  if (value.includes("refer")) return "referral";
+  if (value.includes("promo") || value.includes("gift")) return "promotion";
+  if (value.includes("wallet") || value.includes("card") || value.includes("finance")) return "finance";
+  if (value.includes("result") || value.includes("trophy")) return "check-result";
+  if (value.includes("password") || value.includes("lock")) return "password";
+  if (value.includes("spin") || value.includes("wheel")) return "spin";
+  if (value.includes("coupon") || value.includes("ticket")) return "coupon";
+  if (value.includes("reward") || value.includes("redeem")) return "reward";
+  if (value.includes("bonus") || value.includes("trophy")) return "bonus";
+  return iconForPath(path ?? "");
+}
+
+function AppIcon({ name, className }: { name: IconName; className?: string }) {
+  const cls = className ?? "text-[14px] leading-none";
+  const map: Record<IconName, string> = {
+    home: "🏠",
+    withdraw: "🍀",
+    play: "🎯",
+    history: "📋",
+    contact: "💬",
+    profile: "👤",
+    referral: "👥",
+    promotion: "🎁",
+    finance: "💳",
+    "check-result": "🏆",
+    password: "🔐",
+    spin: "🎡",
+    coupon: "🎟️",
+    bonus: "🏆",
+    reward: "🎁",
+    logout: "🚪",
+    deposit: "💰",
+    diamond: "💎",
+  };
+  return (
+    <span aria-hidden className={`emoji-font ${cls}`}>
+      {map[name]}
+    </span>
+  );
 }
 
 export default function Navbar({ logoUrl, balance, diamond, userName, userPhone, mobileNavItems }: NavbarProps) {
@@ -45,41 +133,43 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
   }, [profileOpen]);
 
   const fallbackNavLinks = [
-    { href: `/${lang}/dashboard`, label: t.home,     icon: "🏠", isCta: false },
-    { href: `/${lang}/withdraw`,  label: t.withdraw, icon: "💸", isCta: false },
-    { href: `/${lang}/bet`,       label: t.play,     icon: "🎯", isCta: true  },
-    { href: `/${lang}/history`,   label: t.history,  icon: "📋", isCta: false },
-    { href: `/${lang}/contact`,   label: t.contact,  icon: "💬", isCta: false },
+    { href: `/${lang}/dashboard`, label: t.home,     icon: "home" as IconName, isCta: false },
+    { href: `/${lang}/withdraw`,  label: t.withdraw, icon: "withdraw" as IconName, isCta: false },
+    { href: `/${lang}/bet`,       label: t.play,     icon: "play" as IconName, isCta: true  },
+    { href: `/${lang}/history`,   label: t.history,  icon: "history" as IconName, isCta: false },
+    { href: `/${lang}/contact`,   label: t.contact,  icon: "contact" as IconName, isCta: false },
   ];
 
   const navLinks = mobileNavItems && mobileNavItems.length > 0
     ? mobileNavItems.map((item) => ({
         href:  `/${lang}${item.action_value.startsWith("/") ? item.action_value : `/${item.action_value}`}`,
         label: item.label_i18n?.[lang] ?? item.label,
-        icon:  item.icon,
+        icon:  normalizeIcon(item.icon, item.action_value),
         isCta: item.item_type === "center_cta",
       }))
     : fallbackNavLinks;
 
   const desktopNavLinks = [
-    { href: `/${lang}/dashboard`, label: t.home,    icon: "🏠" },
-    { href: `/${lang}/history`,   label: t.history, icon: "📋" },
-    { href: `/${lang}/bet`,       label: t.play,    icon: "🎯" },
-    { href: `/${lang}/withdraw`,  label: t.withdraw, icon: "💸" },
-    { href: `/${lang}/check-result`, label: t.checkResult, icon: "🏆" },
-    { href: `/${lang}/contact`,   label: t.contact,  icon: "💬" },
+    { href: `/${lang}/dashboard`, label: t.home,    icon: "home" as IconName },
+    { href: `/${lang}/history`,   label: t.history, icon: "history" as IconName },
+    { href: `/${lang}/bet`,       label: t.play,    icon: "play" as IconName },
+    { href: `/${lang}/withdraw`,  label: t.withdraw, icon: "withdraw" as IconName },
+    { href: `/${lang}/check-result`, label: t.checkResult, icon: "check-result" as IconName },
+    { href: `/${lang}/contact`,   label: t.contact,  icon: "contact" as IconName },
   ];
 
   const profileMenuItems = [
-    { icon: "👤", label: t.profile,        href: `/${lang}/profile` },
-    { icon: "💰", label: t.referral,       href: `/${lang}/referral` },
-    { icon: "📋", label: t.history,        href: `/${lang}/history` },
-    { icon: "🎁", label: t.promotion,      href: `/${lang}/promotion` },
-    { icon: "💳", label: t.finance,        href: `/${lang}/transactions` },
-    { icon: "🏆", label: t.checkResult,    href: `/${lang}/check-result` },
-    { icon: "🔐", label: t.changePassword, href: `/${lang}/change-password` },
-    { icon: "🎡", label: t.spin,           href: `/${lang}/spin` },
-    { icon: "🎟️", label: t.coupon,         href: `/${lang}/coupon` },
+    { icon: "profile" as IconName, label: t.profile,        href: `/${lang}/profile` },
+    { icon: "referral" as IconName, label: t.referral,       href: `/${lang}/referral` },
+    { icon: "history" as IconName, label: t.history,        href: `/${lang}/history` },
+    { icon: "promotion" as IconName, label: t.promotion,      href: `/${lang}/promotion` },
+    { icon: "finance" as IconName, label: t.finance,        href: `/${lang}/transactions` },
+    { icon: "check-result" as IconName, label: t.checkResult,    href: `/${lang}/check-result` },
+    { icon: "password" as IconName, label: t.changePassword, href: `/${lang}/change-password` },
+    { icon: "spin" as IconName, label: t.spin,           href: `/${lang}/spin` },
+    { icon: "coupon" as IconName, label: t.coupon,         href: `/${lang}/coupon` },
+    { icon: "bonus" as IconName,  label: t.bonus,          href: `/${lang}/bonus` },
+    { icon: "reward" as IconName, label: t.reward,         href: `/${lang}/reward` },
   ];
 
   const liveBalance = user?.balance ?? balance;
@@ -112,10 +202,10 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
               return (
                 <Link key={l.href} href={l.href}
                   className={[
-                    "flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-medium transition-all",
+                    "flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-medium transition-all whitespace-nowrap",
                     active ? "bg-ap-blue/10 text-ap-blue" : "text-ap-secondary hover:bg-ap-bg hover:text-ap-primary",
                   ].join(" ")}>
-                  <span className="text-[14px]">{l.icon}</span>
+                  <AppIcon name={l.icon} className="text-[14px] leading-none" />
                   {l.label}
                 </Link>
               );
@@ -128,7 +218,7 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
             {/* Balance */}
             <Link href={`/${lang}/deposit`}
               className="flex items-center gap-1.5 bg-ap-bg border border-ap-border rounded-full px-2.5 sm:px-3 py-1.5 hover:border-ap-blue/30 transition-colors">
-              <span className="text-[13px]">💰</span>
+              <AppIcon name="deposit" className="text-[14px] leading-none" />
                 <span className="text-[12px] sm:text-[13px] font-semibold text-ap-primary tabular-nums">
                 ฿{liveBalance.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
@@ -147,25 +237,29 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 top-[calc(100%+8px)] w-[240px] bg-white rounded-2xl shadow-card-xl border border-ap-border overflow-x-hidden overflow-y-auto max-h-[calc(100dvh-88px)] sm:max-h-[80vh] overscroll-contain animate-pop-in z-50">
+                <div className="absolute right-0 top-[calc(100%+8px)] w-[248px] bg-white rounded-2xl shadow-[0_16px_36px_rgba(15,23,42,0.18)] border border-slate-200 overflow-x-hidden overflow-y-auto max-h-[calc(100dvh-88px)] sm:max-h-[80vh] overscroll-contain animate-pop-in z-50">
                   {/* Language switcher */}
-                  <div className="px-4 py-2 flex items-center justify-between border-b border-ap-border bg-ap-bg/60">
-                    <span className="text-[12px] text-ap-secondary">{t.language}</span>
+                  <div className="px-4 pt-2.5 pb-2 flex items-center justify-between">
+                    <span className="text-[12px] font-medium text-slate-500">{t.language}</span>
                     <button
                       type="button"
                       onClick={() => { setProfileOpen(false); setLangModalOpen(true); }}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-ap-border text-[12px] font-medium text-ap-primary hover:border-ap-blue/40 transition-all"
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[12px] font-medium text-slate-700 hover:border-ap-blue/35 transition-all"
                     >
-                      <span>{LANGS.find((l) => l.code === lang)?.flag}</span>
+                      <img
+                        src={LANGS.find((l) => l.code === lang)?.flagIcon}
+                        alt={LANGS.find((l) => l.code === lang)?.flag ?? lang}
+                        className="w-4 h-4 rounded-sm object-cover"
+                      />
                       <span>{LANGS.find((l) => l.code === lang)?.label}</span>
                       <svg className="w-3 h-3 text-ap-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 9l-7 7-7-7"/></svg>
                     </button>
                   </div>
 
                   {/* Header */}
-                  <div className="px-4 py-3.5 border-b border-ap-border bg-ap-bg/60">
+                  <div className="px-4 pb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-ap-blue flex items-center justify-center text-white font-bold text-[15px] flex-shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-ap-blue flex items-center justify-center text-white font-bold text-[14px] flex-shrink-0">
                         {initials}
                       </div>
                       <div className="min-w-0">
@@ -173,47 +267,64 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
                         {liveUserPhone && <p className="text-[12px] text-ap-tertiary">{liveUserPhone}</p>}
                       </div>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <div className="flex flex-col items-center bg-white rounded-xl px-3 py-2 border border-ap-border">
-                        <span className="text-[11px] text-ap-tertiary">{t.balance}</span>
-                        <span className="text-[13px] font-bold text-ap-blue tabular-nums">
+                    <div className="mt-3 grid grid-cols-2 gap-1.5">
+                      <div className="flex flex-col items-center rounded-xl px-2.5 py-2 border border-slate-200 bg-slate-50/70">
+                        <span className="text-[11px] text-slate-500">{t.balance}</span>
+                        <span className="text-[16px] leading-none mt-0.5 font-extrabold text-ap-blue tabular-nums tracking-tight">
                           ฿{liveBalance.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
-                      <div className="flex flex-col items-center bg-blue-50 rounded-xl px-3 py-2 border border-blue-100">
-                        <span className="text-[11px] text-ap-tertiary">Diamond</span>
-                        <span className="text-[13px] font-bold text-ap-blue tabular-nums">💎 {liveDiamond}</span>
+                      <div className="flex flex-col items-center rounded-xl px-2.5 py-2 border border-slate-200 bg-slate-50/70">
+                        <span className="text-[11px] text-slate-500">Diamond</span>
+                        <span className="text-[16px] leading-none mt-0.5 font-extrabold text-cyan-700 tabular-nums inline-flex items-center justify-center gap-1.5 tracking-tight">
+                          <AppIcon name="diamond" className="text-[15px] leading-none" />
+                          <span className="leading-none">{liveDiamond.toLocaleString("th-TH")}</span>
+                        </span>
                       </div>
                     </div>
                   </div>
+                  <div className="mx-4 border-t border-slate-200/80" />
 
                   {/* Menu */}
                   <div className="py-1.5">
-                    {profileMenuItems.map((item) => (
+                    {profileMenuItems.map((item) => {
+                      const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                      return (
                       <Link
                         key={item.href}
                         href={item.href}
                         onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors text-ap-primary hover:bg-ap-bg"
+                        className={[
+                          "group flex items-center gap-2.5 px-3 py-2.5 text-[13px] rounded-xl mx-1.5 border border-transparent transition-all duration-200 ease-out",
+                          active
+                            ? "bg-ap-blue/10 text-ap-blue font-semibold"
+                            : "text-ap-primary font-medium hover:bg-gradient-to-r hover:from-[#ffffff] hover:to-[#f3f8ff] hover:border-[#d9e8ff] hover:shadow-[0_6px_14px_rgba(37,99,235,0.10)] hover:-translate-y-[1px]",
+                        ].join(" ")}
                       >
-                        <span className="text-[16px] w-5 text-center flex-shrink-0">{item.icon}</span>
+                        <span className={[
+                          "w-6.5 h-6.5 rounded-lg flex items-center justify-center border transition-all duration-200",
+                          active
+                            ? "bg-white border-ap-blue/25 text-ap-blue"
+                            : "bg-slate-50 border-slate-200 text-slate-600 group-hover:border-[#bfdbfe] group-hover:bg-[#eff6ff] group-hover:text-ap-blue group-hover:scale-[1.04]",
+                        ].join(" ")}>
+                          <AppIcon name={item.icon} className="w-4 h-4" />
+                        </span>
                         {item.label}
-                        {item.href === `/${lang}/referral` ? (
-                          <span className="ml-auto text-[10px] font-bold text-white bg-ap-red rounded-full px-1.5 py-0.5">ใหม่</span>
-                        ) : (
-                          <svg className="ml-auto w-3.5 h-3.5 text-ap-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M9 18l6-6-6-6" />
-                          </svg>
-                        )}
+                        <svg className="ml-auto w-3.5 h-3.5 text-slate-400 transition-all duration-200 group-hover:text-ap-blue group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
                       </Link>
-                    ))}
-                    <div className="border-t border-ap-border pt-1">
+                      );
+                    })}
+                    <div className="border-t border-slate-200/80 pt-1.5 mt-1">
                       <form action={logoutAction}>
                         <button
                           type="submit"
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors text-ap-red hover:bg-ap-red/5"
+                          className="group w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-medium transition-all duration-200 ease-out text-ap-red hover:bg-gradient-to-r hover:from-rose-50 hover:to-white hover:border-rose-200/80 border border-transparent hover:shadow-[0_6px_14px_rgba(244,63,94,0.10)] rounded-xl mx-1.5"
                         >
-                          <span className="text-[16px] w-5 text-center flex-shrink-0">🚪</span>
+                          <span className="w-6.5 h-6.5 rounded-lg flex items-center justify-center border bg-rose-50 border-rose-200 text-rose-500 transition-transform duration-200 group-hover:scale-[1.04]">
+                            <AppIcon name="logout" className="w-4 h-4" />
+                          </span>
                           {t.logout}
                         </button>
                       </form>
@@ -252,7 +363,7 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
                       : "text-ap-primary hover:bg-ap-bg border border-transparent",
                   ].join(" ")}
                 >
-                  <span className="text-[20px]">{l.flag}</span>
+                  <img src={l.flagIcon} alt={l.flag} className="w-5 h-5 rounded-sm object-cover" />
                   <span>{l.label}</span>
                   {lang === l.code && (
                     <svg className="ml-auto w-4 h-4 text-ap-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 13l4 4L19 7"/></svg>
@@ -272,13 +383,15 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
           {navLinks.map((l) => {
             const active = pathname === l.href || pathname.startsWith(l.href + "/");
             const isPlay = l.isCta;
+            const ctaLabel = l.label.replace(/\s*→\s*$/g, "").replace(/\s+/g, " ").trim();
             return (
               <Link key={l.href} href={l.href}
                 className={[
-                  "flex flex-col items-center justify-center gap-0.5 min-w-0 transition-all active:scale-95",
+                  "min-w-0 transition-all active:scale-95",
+                  isPlay ? "flex items-center justify-center gap-1.5 whitespace-nowrap" : "flex flex-col items-center justify-center gap-0.5",
                   isPlay
                     ? [
-                        "relative -mt-4 mb-1 mx-1 rounded-2xl py-2 shadow-lg border",
+                        "relative -mt-4 mb-1 mx-1 px-2.5 rounded-2xl py-2 shadow-lg border",
                         active
                           ? "bg-ap-blue text-white border-ap-blue"
                           : "bg-ap-blue text-white border-ap-blue/70 hover:bg-ap-blue-h",
@@ -288,13 +401,25 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
                         active ? "text-ap-blue" : "text-ap-tertiary",
                       ].join(" "),
                 ].join(" ")}>
-                <span className={["leading-none", isPlay ? "text-[24px]" : "text-[22px]"].join(" ")}>{l.icon}</span>
-                <span className={[
-                  "text-[10px] truncate w-full text-center px-0.5 leading-tight",
-                  isPlay ? "font-bold" : active ? "font-bold" : "font-medium",
-                ].join(" ")}>
-                  {l.label}
-                </span>
+                <AppIcon name={l.icon} className={["shrink-0", isPlay ? "w-6 h-6" : "w-[22px] h-[22px]"].join(" ")} />
+                {isPlay ? (
+                  <span className="text-[11px] leading-none font-bold whitespace-nowrap">
+                    {ctaLabel}
+                  </span>
+                ) : (
+                  <span className={[
+                    "block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[10px] w-full text-center px-0.5 leading-none",
+                    active ? "font-bold" : "font-medium",
+                  ].join(" ")}>
+                    {l.label}
+                  </span>
+                )}
+                {isPlay && (
+                  <svg className="w-3.5 h-3.5 text-white/90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+                    <path d="M5 12h14" />
+                    <path d="M13 6l6 6-6 6" />
+                  </svg>
+                )}
               </Link>
             );
           })}

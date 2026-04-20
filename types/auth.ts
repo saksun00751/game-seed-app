@@ -22,6 +22,7 @@ export interface RegisterState {
     lastname?: string;
     bank?: string;
     acc_no?: string;
+    tel?: string;
   };
   success?: boolean;
   phone?: string;

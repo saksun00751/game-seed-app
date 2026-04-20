@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import RegisterPageClient from "@/components/auth/RegisterPageClient";
-import { apiGet } from "@/lib/api/client";
+import RegisterWithUsernamePageClient from "@/components/auth/RegisterWithUsernamePageClient";
 import type { BankOption } from "@/components/auth/RegisterForm";
 import { getSiteMeta, getLogoUrl } from "@/lib/api/site";
+import { getBanks } from "@/lib/api/banks";
+import { getRegisterClientVariant } from "@/lib/config/register";
 
 export const metadata: Metadata = { title: "สมัครสมาชิก — Lotto" };
 
@@ -11,31 +13,23 @@ interface Props {
   searchParams?: Promise<{ ref?: string }>;
 }
 
-interface ApiBankItem {
-  code:      number;
-  name_th:   string;
-  shortcode: string;
-  image:     string;
-  image_url: string;
-}
-
-interface BanksResponse {
-  success?: boolean;
-  data?: { banks?: ApiBankItem[] };
-}
-
-export default async function RegisterPage({ searchParams }: Props) {
-  const params     = await searchParams;
-  const defaultRef = (params?.ref ?? "").toUpperCase();
+export default async function RegisterPage({ params, searchParams }: Props) {
+  const { locale } = (await params) ?? { locale: "th" };
+  const query      = await searchParams;
+  const defaultRef = (query?.ref ?? "").toUpperCase();
+  const registerClient = getRegisterClientVariant();
+  const RegisterClient = registerClient === "registerWithUsername"
+    ? RegisterWithUsernamePageClient
+    : RegisterPageClient;
 
   let banks: BankOption[] = [];
   try {
-    const res = await apiGet<BanksResponse>("/auth/register/banks");
-    banks = (res.data?.banks ?? []).map((b) => ({
+    const bankOptions = await getBanks();
+    banks = bankOptions.map((b) => ({
       code:      b.code,
       name_th:   b.name_th,
       shortcode: b.shortcode,
-      image:     b.image_url || b.image,
+      image:     b.image_url,
     }));
   } catch {}
 
@@ -51,7 +45,7 @@ export default async function RegisterPage({ searchParams }: Props) {
         <div className="absolute -bottom-32 -left-32 w-[400px] h-[400px] rounded-full bg-ap-blue/[0.03] blur-3xl" />
       </div>
 
-      <RegisterPageClient defaultRef={defaultRef} banks={banks} logoUrl={logoUrl} />
+      <RegisterClient initialLang={locale} defaultRef={defaultRef} banks={banks} logoUrl={logoUrl} />
     </main>
   );
 }

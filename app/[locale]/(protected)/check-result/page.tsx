@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { requireAuth } from "@/lib/session/auth";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
 import { apiGet } from "@/lib/api/client";
 import type { MarketsLatestResponse } from "@/lib/api/lotto";
@@ -14,7 +13,6 @@ interface TicketsResponse {
 }
 
 export default async function CheckResultRoute() {
-  await requireAuth();
   const [token, lang] = await Promise.all([getApiToken(), getLangCookie()]);
 
   let groups: MarketsLatestResponse["data"]["groups"] = [];

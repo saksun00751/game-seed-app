@@ -416,7 +416,8 @@ export default function RegisterForm({ defaultRef = "", banks = [] }: { defaultR
             leftEl={<LockIcon />}
             rightEl={
               <button type="button" onClick={() => setShowPw(!showPw)}
-                className="text-ap-tertiary hover:text-ap-secondary transition-colors" tabIndex={-1}>
+                aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                className="text-ap-tertiary hover:text-ap-secondary transition-colors">
                 <EyeIcon open={showPw} />
               </button>
             }
@@ -441,7 +442,8 @@ export default function RegisterForm({ defaultRef = "", banks = [] }: { defaultR
                 </div>
               )}
               <button type="button" onClick={() => setShowConfirm(!showConfirm)}
-                className="text-ap-tertiary hover:text-ap-secondary transition-colors" tabIndex={-1}>
+                aria-label={showConfirm ? "ซ่อนรหัสผ่านยืนยัน" : "แสดงรหัสผ่านยืนยัน"}
+                className="text-ap-tertiary hover:text-ap-secondary transition-colors">
                 <EyeIcon open={showConfirm} />
               </button>
             </div>
@@ -479,9 +481,9 @@ export default function RegisterForm({ defaultRef = "", banks = [] }: { defaultR
           </button>
           <span className="text-[13px] text-ap-secondary leading-relaxed select-none">
             {t.agreePrefix}{" "}
-            <a href="#" className="text-ap-blue font-medium hover:opacity-70" onClick={(e) => e.stopPropagation()}>{t.termsLink}</a>
+            <a href={`/${lang}/contact-public`} className="text-ap-blue font-medium hover:opacity-70" onClick={(e) => e.stopPropagation()}>{t.termsLink}</a>
             {" "}{t.and}{" "}
-            <a href="#" className="text-ap-blue font-medium hover:opacity-70" onClick={(e) => e.stopPropagation()}>{t.privacyLink}</a>
+            <a href={`/${lang}/contact-public`} className="text-ap-blue font-medium hover:opacity-70" onClick={(e) => e.stopPropagation()}>{t.privacyLink}</a>
           </span>
         </label>
 

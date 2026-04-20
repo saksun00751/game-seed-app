@@ -63,7 +63,7 @@ function PasswordField({
         <button
           type="button"
           onClick={onToggle}
-          tabIndex={-1}
+          aria-label={show ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
           className="absolute right-4 top-1/2 -translate-y-1/2 text-ap-tertiary hover:text-ap-secondary transition-colors"
         >
           <EyeIcon open={show} />
@@ -223,7 +223,7 @@ export default function ChangePasswordModal({ hasPassword: _hasPassword }: { has
                   <button
                     type="button"
                     onClick={() => setShowConf((v) => !v)}
-                    tabIndex={-1}
+                    aria-label={showConf ? "ซ่อนรหัสผ่านยืนยัน" : "แสดงรหัสผ่านยืนยัน"}
                     className="text-ap-tertiary hover:text-ap-secondary transition-colors"
                   >
                     <EyeIcon open={showConf} />

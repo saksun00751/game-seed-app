@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { LangProvider } from "@/lib/i18n/context";
 import CouponPage, { type CouponItem } from "@/components/coupon/CouponPage";
-import { requireAuth } from "@/lib/session/auth";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
 import { apiGet, apiPost, ApiError } from "@/lib/api/client";
 
@@ -19,7 +18,6 @@ interface CouponApiResponse {
 }
 
 export default async function CouponRoute({ params }: Props) {
-  await requireAuth();
   const { locale } = await params;
   const [token, lang] = await Promise.all([getApiToken(), getLangCookie()]);
 

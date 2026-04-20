@@ -4,6 +4,7 @@ import { LangProvider } from "@/lib/i18n/context";
 import { getSiteMeta, getLogoUrl } from "@/lib/api/site";
 import { Toaster } from "sonner";
 import ApiErrorToastListener from "@/components/providers/ApiErrorToastListener";
+import ToastSoundBridge from "@/components/providers/ToastSoundBridge";
 
 export async function generateMetadata(): Promise<Metadata> {
   try {
@@ -53,18 +54,25 @@ export default async function LocaleLayout({
     <LangProvider initialLang={locale}>
       <ProgressBar />
       <ApiErrorToastListener />
+      <ToastSoundBridge />
       <Toaster
         position="top-center"
+        offset={20}
         richColors
         expand
         gap={12}
         toastOptions={{
-          style: {
-            fontSize: "16px",
-            borderRadius: "10px",
-            fontWeight: "500",
-            padding: "16px 20px",
-            minWidth: "340px",
+          duration: 3600,
+          classNames: {
+            toast: "app-toast",
+            content: "app-toast-content",
+            title: "app-toast-title",
+            icon: "app-toast-icon",
+            closeButton: "app-toast-close",
+            success: "app-toast-success",
+            error: "app-toast-error",
+            warning: "app-toast-warning",
+            info: "app-toast-info",
           },
         }}
       />

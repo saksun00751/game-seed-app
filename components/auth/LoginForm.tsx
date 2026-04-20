@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { loginWithPasswordAction } from "@/lib/actions";
+import { getRegisterPagePath } from "@/lib/config/register";
 import Input from "@/components/ui/Input";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { useLang } from "@/lib/i18n/context";
@@ -29,9 +30,10 @@ function SubmitButton({ children, disabled }: { children: React.ReactNode; disab
   );
 }
 
-const PhoneIcon = () => (
+const UserIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.11 12 19.79 19.79 0 0 1 1.07 3.35 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
   </svg>
 );
 
@@ -54,23 +56,6 @@ const EyeIcon = ({ open }: { open: boolean }) =>
     </svg>
   );
 
-export function formatPhone(raw: string) {
-  const d = raw.replace(/\D/g, "").slice(0, 10);
-  if (d.length <= 3) return d;
-  if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
-  return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
-}
-
-function maskPhone(phone: string) {
-  const d = phone.replace(/\D/g, "");
-  return `${d.slice(0, 3)}-${d.slice(3, 5)}X-XXXX`;
-}
-
-export function isValidPhoneFormat(phone: string): boolean {
-  const digits = phone.replace(/\D/g, "");
-  return /^0[6-9]\d{8}$/.test(digits);
-}
-
 function ErrorBanner({ msg }: { msg: string }) {
   return (
     <div className="flex items-start gap-2.5 bg-ap-red/5 border border-ap-red/20 rounded-2xl px-4 py-3 animate-fade-in">
@@ -85,13 +70,14 @@ function ErrorBanner({ msg }: { msg: string }) {
 export default function LoginForm() {
   const t = useTranslation("login");
   const { lang } = useLang();
+  const registerPath = getRegisterPagePath(lang);
 
-  const [phoneDisplay, setPhoneDisplay] = useState("");
-  const [phoneError, setPhoneError]     = useState("");
-  const [password, setPassword]         = useState("");
-  const [showPw, setShowPw]             = useState(false);
-  const [remember, setRemember]         = useState(false);
-  const [success, setSuccess]           = useState(false);
+  const [username, setUsername] = useState("");
+  const [usernameError, setUsernameError] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [remember, setRemember] = useState(false);
+  const [success, setSuccess] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const [pwState, pwAction] = useActionState(loginWithPasswordAction, {});
@@ -116,18 +102,20 @@ export default function LoginForm() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("expired") === "1") setPhoneError(t.errSession);
+    if (params.get("expired") === "1") setUsernameError(t.errSession);
   }, [t.errSession]);
 
-  function validatePhone(): boolean {
-    const digits = phoneDisplay.replace(/\D/g, "");
-    if (!digits) { setPhoneError(t.errPhone); return false; }
-    if (!isValidPhoneFormat(digits)) { setPhoneError(t.errPhoneInvalid); return false; }
+  function validateUsername(): boolean {
+    const value = username.trim();
+    if (!value) {
+      setUsernameError((t as Record<string, string>).errUsername ?? t.errPhone);
+      return false;
+    }
     return true;
   }
 
-  const phoneComplete = phoneDisplay.replace(/\D/g, "").length === 10;
-  const phoneGreenCheck = phoneComplete ? (
+  const usernameComplete = username.trim().length > 0;
+  const usernameGreenCheck = usernameComplete ? (
     <div className="w-5 h-5 rounded-full bg-ap-green flex items-center justify-center animate-pop-in">
       <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
         <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -147,7 +135,7 @@ export default function LoginForm() {
         <h2 className="text-[22px] font-bold text-ap-primary">{t.successTitle}</h2>
         <p className="text-[14px] text-ap-secondary mt-1.5">
           {t.successBack}{" "}
-          <span className="font-semibold text-ap-primary">{maskPhone(phoneDisplay)}</span>
+          <span className="font-semibold text-ap-primary">{username || "-"}</span>
         </p>
         <div className="mt-5 flex items-center justify-center gap-2 text-[13px] text-ap-tertiary">
           <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
@@ -165,17 +153,18 @@ export default function LoginForm() {
   return (
     <div ref={cardRef}>
       <form action={pwAction} className="flex flex-col gap-4"
-        onSubmit={(e) => { if (!validatePhone()) e.preventDefault(); }}>
+        onSubmit={(e) => { if (!validateUsername()) e.preventDefault(); }}>
         <input type="hidden" name="lang" value={lang} />
         <Input
-          label={t.phone}
-          name="user_name" type="tel" inputMode="tel"
-          placeholder="0XX-XXX-XXXX" autoComplete="tel"
-          value={phoneDisplay}
-          onChange={(e) => { setPhoneDisplay(formatPhone(e.target.value.replace(/\D/g, "").slice(0, 10))); setPhoneError(""); }}
-          onBlur={validatePhone}
-          error={phoneError || pwState.fieldErrors?.user_name}
-          leftEl={<PhoneIcon />} rightEl={phoneGreenCheck}
+          label={(t as Record<string, string>).username ?? t.phone}
+          name="user_name" type="text" inputMode="text"
+          placeholder={(t as Record<string, string>).usernamePlaceholder ?? "username"}
+          autoComplete="username"
+          value={username}
+          onChange={(e) => { setUsername(e.target.value); setUsernameError(""); }}
+          onBlur={validateUsername}
+          error={usernameError || pwState.fieldErrors?.user_name}
+          leftEl={<UserIcon />} rightEl={usernameGreenCheck}
         />
         <Input
           label={t.password}
@@ -187,7 +176,8 @@ export default function LoginForm() {
           leftEl={<LockIcon />}
           rightEl={
             <button type="button" onClick={() => setShowPw(!showPw)}
-              className="text-ap-tertiary hover:text-ap-secondary transition-colors" tabIndex={-1}>
+              aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+              className="text-ap-tertiary hover:text-ap-secondary transition-colors">
               <EyeIcon open={showPw} />
             </button>
           }
@@ -209,7 +199,7 @@ export default function LoginForm() {
 
       <p className="text-center text-[13px] text-ap-secondary mt-6">
         {t.noAccount}{" "}
-        <a href={`/${lang}/register`} className="text-ap-blue font-semibold hover:opacity-70">{t.register}</a>
+        <a href={registerPath} className="text-ap-blue font-semibold hover:opacity-70">{t.register}</a>
       </p>
     </div>
   );

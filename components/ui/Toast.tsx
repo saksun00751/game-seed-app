@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 interface Props {
   message: string;
@@ -9,40 +9,28 @@ interface Props {
   onClose: () => void;
 }
 
+const TOAST_DEDUP_WINDOW_MS = 700;
+const toastDedupMap = new Map<string, number>();
+
 export default function Toast({ message, type = "error", durationMs = 3500, onClose }: Props) {
-  const [visible, setVisible] = useState(false);
-
   useEffect(() => {
-    // mount animation
-    requestAnimationFrame(() => setVisible(true));
-    const t = setTimeout(() => {
-      setVisible(false);
-      setTimeout(onClose, 300);
-    }, durationMs);
+    const dedupKey = `${type}:${message.trim()}`;
+    const now = Date.now();
+    const lastShownAt = toastDedupMap.get(dedupKey) ?? 0;
+    if (now - lastShownAt < TOAST_DEDUP_WINDOW_MS) {
+      const t = setTimeout(onClose, 0);
+      return () => clearTimeout(t);
+    }
+    toastDedupMap.set(dedupKey, now);
+
+    const id = `legacy-toast:${dedupKey}`;
+    if (type === "success") toast.success(message, { duration: durationMs, id });
+    else if (type === "warning") toast.warning(message, { duration: durationMs, id });
+    else toast.error(message, { duration: durationMs, id });
+
+    const t = setTimeout(onClose, 0);
     return () => clearTimeout(t);
-  }, [durationMs, onClose]);
+  }, [durationMs, message, onClose, type]);
 
-  const styles = {
-    error:   "bg-ap-red   text-white",
-    success: "bg-ap-green text-white",
-    warning: "bg-yellow-500 text-white",
-  };
-
-  const icons = { error: "✕", success: "✓", warning: "⚠" };
-
-  return createPortal(
-    <div className="fixed top-5 left-1/2 z-[999] -translate-x-1/2 pointer-events-none">
-      <div className={[
-        "flex items-center gap-3 px-6 py-4 rounded-2xl shadow-card-xl min-w-[320px] max-w-[92vw] transition-all duration-300",
-        styles[type],
-        visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-3",
-      ].join(" ")}>
-        <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-[15px] font-black shrink-0">
-          {icons[type]}
-        </span>
-        <p className="text-[16px] font-semibold leading-snug">{message}</p>
-      </div>
-    </div>,
-    document.body
-  );
+  return null;
 }

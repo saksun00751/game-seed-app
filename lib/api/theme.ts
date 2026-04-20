@@ -18,19 +18,19 @@ export interface Theme {
 }
 
 const DEFAULT_THEME: Theme = {
-  "ap-bg": "#f5f5f7",
+  "ap-bg": "#edf1f6",
   "ap-card": "#ffffff",
   "ap-blue": "#0071e3",
   "ap-blue-h": "#0077ed",
-  "ap-primary": "#1d1d1f",
-  "ap-secondary": "#4f4f54",
-  "ap-tertiary": "#8e8e93",
-  "ap-border": "rgba(0,0,0,0.08)",
+  "ap-primary": "#0f172a",
+  "ap-secondary": "#334155",
+  "ap-tertiary": "#64748b",
+  "ap-border": "rgba(15, 23, 42, 0.14)",
   "ap-red": "#ff3b30",
   "ap-green": "#34c759",
   "ap-orange": "#ff9500",
-  "page-bg": "#f5f5f7",
-  "navbar-bg": "rgba(255,255,255,0.9)",
+  "page-bg": "#edf1f6",
+  "navbar-bg": "rgba(255,255,255,0.96)",
   "balance-card-bg": "#0071e3",
 };
 

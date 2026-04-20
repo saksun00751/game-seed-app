@@ -5,7 +5,6 @@ import LotteryLayoutPage from "@/components/bet/LotteryLayoutPage";
 import BetToastNotice from "@/components/bet/BetToastNotice";
 import PromoBanner from "@/components/ui/PromoBanner";
 import GameGroupSlider from "@/components/ui/GameGroupSlider";
-import { requireAuth } from "@/lib/session/auth";
 import { getBetPageData } from "@/lib/server/bet";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
 import { apiGet } from "@/lib/api/client";
@@ -16,11 +15,10 @@ import { getTranslation } from "@/lib/i18n/getTranslation";
 import type { Category } from "@/lib/categories";
 import type { BetRateRow, BettingContext, BettingContextItem, NumberLimitRow } from "@/lib/types/bet";
 import type { BetTypeId } from "@/components/bet/types";
+import { Suspense } from "react";
 
 
 export const metadata: Metadata = { title: "แทงหวย — Lotto" };
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 interface SelectedPackageResponse {
   success: boolean;
@@ -281,9 +279,8 @@ function CategoryCard({
 }
 
 export default async function BetRoute({ params, searchParams }: Props) {
-  const [{ locale }, , sp, apiToken, lang] = await Promise.all([
+  const [{ locale }, sp, apiToken, lang] = await Promise.all([
     params ?? Promise.resolve({ locale: "th" }),
-    requireAuth(),
     searchParams,
     getApiToken(),
     getLangCookie(),
@@ -407,7 +404,9 @@ export default async function BetRoute({ params, searchParams }: Props) {
 
   return (
     <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">
-      <BetToastNotice />
+      <Suspense fallback={null}>
+        <BetToastNotice />
+      </Suspense>
       <div className="max-w-5xl mx-auto px-5 pt-6 space-y-8">
 
         <PromoBanner  />
