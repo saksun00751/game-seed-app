@@ -1,13 +1,12 @@
-import LotteryCategories from "@/components/dashboard/LotteryCategories";
 import BalanceCard from "@/components/dashboard/BalanceCard";
 import type { Metadata } from "next";
+import Link from "next/link";
 import PromoBanner from "@/components/ui/PromoBanner";
+import GameGroupSlider from "@/components/ui/GameGroupSlider";
 import { Suspense } from "react";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
-import { apiGet } from "@/lib/api/client";
-import { mapMarketsToCategories } from "@/lib/api/lotto";
-import type { MarketsLatestResponse } from "@/lib/api/lotto";
-import type { Category } from "@/lib/categories";
+import { getAllGamesGroupedFromApi } from "@/lib/api/games";
+import { getTranslation } from "@/lib/i18n/getTranslation";
 import { getPageMetaTitle } from "@/lib/i18n/metaTitle";
 
 export async function generateMetadata({
@@ -19,20 +18,58 @@ export async function generateMetadata({
   return { title: await getPageMetaTitle(locale, "dashboard") };
 }
 
-async function DashboardLotterySection() {
+async function DashboardGamesSection({ locale }: { locale: string }) {
   const [apiToken, lang] = await Promise.all([getApiToken(), getLangCookie()]);
-  let categories: Category[] = [];
+  let gameGroups: Awaited<ReturnType<typeof getAllGamesGroupedFromApi>> = [];
   try {
-    const res = await apiGet<MarketsLatestResponse>("/lotto/markets/latest", apiToken ?? undefined, lang);
-    if (res?.data?.groups) {
-      categories = mapMarketsToCategories(res.data.groups);
-    }
+    gameGroups = await getAllGamesGroupedFromApi(apiToken ?? undefined, lang);
   } catch {}
 
-  return <LotteryCategories initialCategories={categories} />;
+  return <DashboardGamesContent locale={locale} gameGroups={gameGroups} />;
 }
 
-function DashboardLotteryFallback() {
+interface DashboardGamesContentProps {
+  locale: string;
+  gameGroups: Awaited<ReturnType<typeof getAllGamesGroupedFromApi>>;
+}
+
+function DashboardGamesContent({ locale, gameGroups }: DashboardGamesContentProps) {
+  const t = getTranslation(locale, "bet");
+
+  return (
+    <div className="space-y-8">
+      {/* Games Section */}
+      {gameGroups.map((group) => {
+        const headerGradient: Record<string, string> = {
+          SLOT:      "from-rose-500 to-pink-400",
+          CASINO:    "from-amber-500 to-yellow-400",
+          SPORT:     "from-green-600 to-lime-400",
+          CARDGROUP: "from-violet-600 to-purple-400",
+          COCK:      "from-orange-600 to-red-400",
+          FISH:      "from-cyan-500 to-teal-400",
+        };
+        const gradient = headerGradient[group.game_type] ?? "from-gray-500 to-gray-400";
+        return (
+          <section key={group.game_type} className="bg-white rounded-2xl border border-ap-border shadow-card overflow-hidden">
+            <div className={`bg-gradient-to-r ${gradient} flex items-center justify-between px-4 py-3`}>
+              <h2 className="text-[15px] font-bold text-white tracking-tight">
+                {group.emoji} {(t as Record<string, string>)[group.game_type] ?? group.label}
+              </h2>
+              <Link href={`/${locale}/games/${group.game_type.toLowerCase()}`} className="text-[14px] font-semibold text-white/80 hover:text-white">
+                {t.viewAll} ({group.providers.length}) →
+              </Link>
+            </div>
+            <div className="px-4 py-3">
+              <GameGroupSlider games={group.providers} gameType={group.game_type.toLowerCase()} />
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function DashboardGamesFallback() {
   return (
     <div className="space-y-3">
       {[1, 2, 3].map((i) => (
@@ -53,7 +90,12 @@ function DashboardLotteryFallback() {
   );
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
   return (
     <div className="relative min-h-screen bg-ap-bg pb-20 sm:pb-8 overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
@@ -63,8 +105,8 @@ export default function DashboardPage() {
       <div className="relative max-w-5xl mx-auto px-5 pt-6 space-y-8">
         <BalanceCard phone="" displayName="" />
         <PromoBanner />
-        <Suspense fallback={<DashboardLotteryFallback />}>
-          <DashboardLotterySection />
+        <Suspense fallback={<DashboardGamesFallback />}>
+          <DashboardGamesSection locale={locale} />
         </Suspense>
       </div>
     </div>
