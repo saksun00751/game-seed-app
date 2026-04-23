@@ -2,6 +2,7 @@ import { requireAuth } from "@/lib/session/auth";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
 import UserProvider from "@/components/providers/UserProvider";
 import Navbar from "@/components/layout/Navbar";
+import ContactFAB from "@/components/ContactFAB";
 import { getSiteMeta, getLogoUrl } from "@/lib/api/site";
 import { getNavbarConfig } from "@/lib/api/navbar";
 
@@ -29,6 +30,7 @@ export default async function ProtectedLayout({
         mobileNavItems={mobileNavItems}
       />
       {children}
+      <ContactFAB />
     </UserProvider>
   );
 }
