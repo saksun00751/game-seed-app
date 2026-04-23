@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import type { GameProviderItem } from "@/lib/api/games";
-import { useLang } from "@/lib/i18n/context";
 
 interface Props {
   games:    GameProviderItem[];
@@ -13,7 +13,8 @@ export default function GameGroupSlider({ games, gameType }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const idxRef   = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { lang } = useLang();
+  const params = useParams();
+  const lang = (params?.locale as string) || "th";
 
   const scrollTo = (i: number) => {
     const el = trackRef.current;
