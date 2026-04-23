@@ -5,7 +5,7 @@ import { getSiteMeta, getLogoUrl } from "@/lib/api/site";
 import { Toaster } from "sonner";
 import ApiErrorToastListener from "@/components/providers/ApiErrorToastListener";
 import ToastSoundBridge from "@/components/providers/ToastSoundBridge";
-// import ContactFAB from "@/components/ContactFAB";
+import ContactFAB from "@/components/ContactFAB";
 
 export async function generateMetadata(): Promise<Metadata> {
   try {
@@ -87,7 +87,7 @@ export default async function LocaleLayout({
           },
         }}
       />
-      {/* <ContactFAB /> */}
+      <ContactFAB />
       {children}
     </LangProvider>
   );

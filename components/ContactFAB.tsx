@@ -1,117 +1,53 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import { getContactChannels, type ContactChannel } from "@/lib/api/contact-channels";
-import { getTranslation } from "@/lib/i18n/getTranslation";
-
-function getChannelMeta(type: string) {
-  if (type === "line") return {
-    color: "#06C755",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-        <path d="M12 2C6.48 2 2 6.02 2 11c0 3.07 1.6 5.78 4.08 7.5L5 21l3.13-1.56C9.32 19.78 10.63 20 12 20c5.52 0 10-4.02 10-9S17.52 2 12 2zm1 13H7v-1.5h6V15zm2-3H7v-1.5h8V12zm0-3H7V7.5h8V9z" />
-      </svg>
-    ),
-  };
-  if (type === "telegram") return {
-    color: "#229ED9",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.69 7.96c-.12.55-.46.68-.93.43l-2.57-1.89-1.24 1.19c-.14.14-.25.25-.51.25l.18-2.61 4.7-4.24c.2-.18-.04-.28-.32-.1L7.54 14.5l-2.52-.79c-.55-.17-.56-.55.12-.81l9.86-3.8c.46-.17.86.11.64.7z" />
-      </svg>
-    ),
-  };
-  return {
-    color: "#6366f1",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-      </svg>
-    ),
-  };
-}
+import { getContactChannels } from "@/lib/api/contact-channels";
 
 export default function ContactFAB() {
   const params = useParams();
   const locale = params.locale as string;
-  const [isOpen, setIsOpen] = useState(false);
-  const [channels, setChannels] = useState<ContactChannel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [hasChannels, setHasChannels] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     const fetchChannels = async () => {
       try {
         const data = await getContactChannels(locale);
-        setChannels(data);
+        setHasChannels(data.length > 0);
       } catch (err) {
         console.error("Failed to fetch contact channels:", err);
-      } finally {
-        setIsLoading(false);
       }
     };
 
     fetchChannels();
   }, [locale]);
 
-  if (isLoading || channels.length === 0) return null;
+  if (!hasChannels || !isVisible) return null;
 
   return (
-    <>
-      {/* FAB Menu Backdrop */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/30"
-          onClick={() => setIsOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Contact Buttons Menu */}
-      {isOpen && (
-        <div className="fixed bottom-24 right-5 z-50 space-y-2 animate-in fade-in zoom-in-95 duration-200">
-          {channels.map((ch) => {
-            const meta = getChannelMeta(ch.type);
-            return (
-              <a
-                key={ch.code}
-                href={ch.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-end gap-3 group"
-                title={ch.label}
-              >
-                <div className="bg-white rounded-lg shadow-lg px-3 py-2 text-[12px] font-semibold text-ap-primary opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  {ch.label}
-                </div>
-                <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95"
-                  style={{ backgroundColor: meta.color }}
-                >
-                  {meta.icon}
-                </div>
-              </a>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Main FAB Button */}
+    <div className="fixed bottom-20 sm:bottom-5 right-5 z-50 flex flex-col items-end gap-2">
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center text-white font-bold text-2xl bg-ap-blue hover:opacity-90"
-        aria-label="Contact us"
+        type="button"
+        onClick={() => setIsVisible(false)}
+        aria-label="Close"
+        className="w-5 h-5 rounded-full bg-white/90 shadow flex items-center justify-center text-ap-tertiary hover:text-ap-primary active:scale-95 transition"
       >
-        {isOpen ? (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-          </svg>
-        )}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
       </button>
-    </>
+      <Link
+        href={`/${locale}/contact`}
+        aria-label="Contact us"
+        className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all active:scale-95 text-white"
+        style={{ backgroundColor: "#06C755" }}
+      >
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+          <path d="M12 3C6.48 3 2 6.58 2 11c0 2.63 1.6 4.96 4.06 6.44-.17.62-.62 2.23-.7 2.58-.11.45.16.44.34.32.14-.09 2.22-1.51 3.12-2.12.7.1 1.43.15 2.18.15 5.52 0 10-3.58 10-8S17.52 3 12 3zM8.06 13.03H6.3c-.2 0-.36-.16-.36-.36V9.34c0-.2.16-.36.36-.36s.36.16.36.36v2.97h1.4c.2 0 .36.16.36.36s-.16.36-.36.36zm1.66-.36c0 .2-.16.36-.36.36s-.36-.16-.36-.36V9.34c0-.2.16-.36.36-.36s.36.16.36.36v3.33zm4.01 0c0 .16-.1.29-.25.34-.04.01-.07.02-.11.02-.11 0-.22-.05-.29-.14l-1.68-2.29v2.07c0 .2-.16.36-.36.36s-.36-.16-.36-.36V9.34c0-.16.1-.29.25-.34.04-.01.08-.02.11-.02.11 0 .22.05.29.14l1.68 2.29V9.34c0-.2.16-.36.36-.36s.36.16.36.36v3.33zm2.77-1.67c.2 0 .36.16.36.36s-.16.36-.36.36h-1.4v.59h1.4c.2 0 .36.16.36.36s-.16.36-.36.36h-1.76c-.2 0-.36-.16-.36-.36V9.34c0-.2.16-.36.36-.36h1.76c.2 0 .36.16.36.36s-.16.36-.36.36h-1.4v.59h1.4z"/>
+        </svg>
+      </Link>
+    </div>
   );
 }
