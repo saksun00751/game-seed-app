@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PromoBanner from "@/components/ui/PromoBanner";
 import GameGroupSlider from "@/components/ui/GameGroupSlider";
+import LotteryGroups from "@/components/dashboard/LotteryGroups";
 import { Suspense } from "react";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
 import { getAllGamesGroupedFromApi } from "@/lib/api/games";
@@ -22,8 +23,12 @@ async function DashboardGamesSection({ locale }: { locale: string }) {
   const [apiToken, lang] = await Promise.all([getApiToken(), getLangCookie()]);
   let gameGroups: Awaited<ReturnType<typeof getAllGamesGroupedFromApi>> = [];
   try {
-    gameGroups = await getAllGamesGroupedFromApi(apiToken ?? undefined, lang);
-  } catch {}
+    if (apiToken) {
+      gameGroups = await getAllGamesGroupedFromApi(apiToken, lang);
+    }
+  } catch (err) {
+    console.error("Failed to load games:", err);
+  }
 
   return <DashboardGamesContent locale={locale} gameGroups={gameGroups} />;
 }
@@ -108,6 +113,7 @@ export default async function DashboardPage({
         <Suspense fallback={<DashboardGamesFallback />}>
           <DashboardGamesSection locale={locale} />
         </Suspense>
+        <LotteryGroups />
       </div>
     </div>
   );

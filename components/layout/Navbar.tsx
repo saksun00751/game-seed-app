@@ -26,6 +26,13 @@ interface NavbarProps {
   mobileNavItems?: NavbarItem[] | null;
 }
 
+interface NavLink {
+  href: string;
+  label: string;
+  icon: string;
+  isCta: boolean;
+}
+
 type IconName =
   | "home"
   | "withdraw"
@@ -46,46 +53,7 @@ type IconName =
   | "deposit"
   | "diamond";
 
-function iconForPath(path: string): IconName {
-  if (path.includes("/withdraw")) return "withdraw";
-  if (path.includes("/bet")) return "play";
-  if (path.includes("/history")) return "history";
-  if (path.includes("/contact")) return "contact";
-  if (path.includes("/profile")) return "profile";
-  if (path.includes("/referral")) return "referral";
-  if (path.includes("/promotion")) return "promotion";
-  if (path.includes("/transactions")) return "finance";
-  if (path.includes("/check-result")) return "check-result";
-  if (path.includes("/change-password")) return "password";
-  if (path.includes("/spin")) return "spin";
-  if (path.includes("/coupon")) return "coupon";
-  if (path.includes("/bonus")) return "bonus";
-  if (path.includes("/reward")) return "reward";
-  if (path.includes("/deposit")) return "deposit";
-  return "home";
-}
-
-function normalizeIcon(raw: string | null | undefined, path?: string): IconName {
-  const value = (raw ?? "").toLowerCase();
-  if (value.includes("home") || value.includes("house")) return "home";
-  if (value.includes("withdraw")) return "withdraw";
-  if (value.includes("bet") || value.includes("target") || value.includes("play")) return "play";
-  if (value.includes("history") || value.includes("list")) return "history";
-  if (value.includes("contact") || value.includes("chat")) return "contact";
-  if (value.includes("profile") || value.includes("user")) return "profile";
-  if (value.includes("refer")) return "referral";
-  if (value.includes("promo") || value.includes("gift")) return "promotion";
-  if (value.includes("wallet") || value.includes("card") || value.includes("finance")) return "finance";
-  if (value.includes("result") || value.includes("trophy")) return "check-result";
-  if (value.includes("password") || value.includes("lock")) return "password";
-  if (value.includes("spin") || value.includes("wheel")) return "spin";
-  if (value.includes("coupon") || value.includes("ticket")) return "coupon";
-  if (value.includes("reward") || value.includes("redeem")) return "reward";
-  if (value.includes("bonus") || value.includes("trophy")) return "bonus";
-  return iconForPath(path ?? "");
-}
-
-function AppIcon({ name, className }: { name: IconName; className?: string }) {
+function AppIcon({ name, className }: { name: string; className?: string }) {
   const cls = className ?? "text-[14px] leading-none";
   const map: Record<IconName, string> = {
     home: "🏠",
@@ -101,15 +69,16 @@ function AppIcon({ name, className }: { name: IconName; className?: string }) {
     password: "🔐",
     spin: "🎡",
     coupon: "🎟️",
-    bonus: "🏆",
-    reward: "🎁",
+    bonus: "⭐",
+    reward: "🎀",
     logout: "🚪",
     deposit: "💰",
     diamond: "💎",
   };
+  const emoji = map[name as IconName] ?? name;
   return (
     <span aria-hidden className={`emoji-font ${cls}`}>
-      {map[name]}
+      {emoji}
     </span>
   );
 }
@@ -132,19 +101,19 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
     return () => document.removeEventListener("mousedown", onOutside);
   }, [profileOpen]);
 
-  const fallbackNavLinks = [
-    { href: `/${lang}/dashboard`, label: t.home,     icon: "home" as IconName, isCta: false },
-    { href: `/${lang}/withdraw`,  label: t.withdraw, icon: "withdraw" as IconName, isCta: false },
-    { href: `/${lang}/bet`,       label: t.play,     icon: "play" as IconName, isCta: true  },
-    { href: `/${lang}/history`,   label: t.history,  icon: "history" as IconName, isCta: false },
-    { href: `/${lang}/contact`,   label: t.contact,  icon: "contact" as IconName, isCta: false },
+  const fallbackNavLinks: NavLink[] = [
+    { href: `/${lang}/dashboard`, label: t.home,     icon: "🏠", isCta: false },
+    { href: `/${lang}/withdraw`,  label: t.withdraw, icon: "🍀", isCta: false },
+    { href: `/${lang}/bet`,       label: t.play,     icon: "🎯", isCta: true  },
+    { href: `/${lang}/history`,   label: t.history,  icon: "📋", isCta: false },
+    { href: `/${lang}/contact`,   label: t.contact,  icon: "💬", isCta: false },
   ];
 
-  const navLinks = mobileNavItems && mobileNavItems.length > 0
+  const navLinks: NavLink[] = mobileNavItems && mobileNavItems.length > 0
     ? mobileNavItems.map((item) => ({
         href:  `/${lang}${item.action_value.startsWith("/") ? item.action_value : `/${item.action_value}`}`,
         label: item.label_i18n?.[lang] ?? item.label,
-        icon:  normalizeIcon(item.icon, item.action_value),
+        icon:  item.icon,
         isCta: item.item_type === "center_cta",
       }))
     : fallbackNavLinks;
@@ -387,32 +356,18 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
             return (
               <Link key={l.href} href={l.href}
                 className={[
-                  "min-w-0 transition-all active:scale-95 flex flex-col items-center justify-center gap-0.5",
+                  "min-w-0 transition-all active:scale-95 flex flex-col items-center justify-center gap-0.5 py-1.5 pointer-events-auto",
                   isPlay
-                    ? [
-                        "relative -mt-4 mb-1 mx-1 px-2.5 rounded-2xl py-2 shadow-lg border",
-                        active
-                          ? "bg-ap-blue text-white border-ap-blue"
-                          : "bg-ap-blue text-white border-ap-blue/70 hover:bg-ap-blue-h",
-                      ].join(" ")
-                    : [
-                        "py-1.5",
-                        active ? "text-ap-blue" : "text-ap-tertiary",
-                      ].join(" "),
+                    ? active ? "text-ap-blue" : "text-ap-tertiary"
+                    : active ? "text-ap-blue" : "text-ap-tertiary",
                 ].join(" ")}>
-                <AppIcon name={l.icon} className={["shrink-0 leading-none", isPlay ? "text-[28px]" : "w-[22px] h-[22px]"].join(" ")} />
-                {isPlay ? (
-                  <span className="text-[13px] leading-none font-bold whitespace-nowrap">
-                    {ctaLabel}
-                  </span>
-                ) : (
-                  <span className={[
-                    "block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[12px] w-full text-center px-0.5 leading-none",
-                    active ? "font-bold" : "font-bold",
-                  ].join(" ")}>
-                    {l.label}
-                  </span>
-                )}
+                <AppIcon name={l.icon} className="shrink-0 leading-none w-[22px] h-[22px]" />
+                <span className={[
+                  "block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[12px] w-full text-center px-0.5 leading-none",
+                  active ? "font-bold" : "font-bold",
+                ].join(" ")}>
+                  {isPlay ? ctaLabel : l.label}
+                </span>
               </Link>
             );
           })}
