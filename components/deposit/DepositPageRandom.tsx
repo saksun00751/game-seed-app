@@ -164,7 +164,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
         return;
       }
       const picked = accounts[0];
-      const min = parseFloat(picked.deposit_min) || 0;
+      const min = Math.max(parseFloat(picked.deposit_min) || 0, 100);
       if (amt < min) {
         setError(`ยอดฝากขั้นต่ำ ฿${min.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
         return;
