@@ -460,6 +460,17 @@ function BankCard({
       {account.remark && (
         <p className="text-[13px] text-amber-600 mt-2 bg-amber-50 rounded-lg px-2 py-1">{account.remark}</p>
       )}
+
+      {account.qrcode && account.qr_pic && (
+        <div className="mt-3 flex flex-col items-center gap-2 rounded-xl bg-white border border-ap-border p-3">
+          <p className="text-[12px] font-bold text-ap-tertiary uppercase tracking-wide">สแกน QR Code</p>
+          <img
+            src={account.qr_pic}
+            alt="QR Code"
+            className="w-56 h-56 object-contain"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -491,7 +502,7 @@ function Notes() {
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
-export default function DepositPage({ displayName, bankName, bankLogo, bankAccount, balance, selectedPromotion }: Props) {
+export default function DepositPageNormal({ displayName, bankName, bankLogo, bankAccount, balance, selectedPromotion }: Props) {
   const { lang } = useLang();
 
   const [method,      setMethod]      = useState<ChannelKey | null>(null);

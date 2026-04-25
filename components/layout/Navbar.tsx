@@ -351,27 +351,16 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${navLinks.length}, 1fr)` }}>
           {navLinks.map((l) => {
             const active = pathname === l.href || pathname.startsWith(l.href + "/");
-            const isPlay = l.isCta;
             return (
               <Link key={l.href} href={l.href}
                 className={[
-                  "flex flex-col w-100 items-center justify-center gap-0.5 min-w-0 transition-all active:scale-95",
-                  isPlay
-                    ? [
-                        "relative -mt-4 mb-1 mx-1 rounded-2xl py-2 shadow-lg border",
-                        active
-                          ? "bg-ap-blue text-white border-ap-blue"
-                          : "bg-ap-blue text-white border-ap-blue/70 hover:bg-ap-blue-h",
-                      ].join(" ")
-                    : [
-                        "py-1.5",
-                        active ? "text-ap-blue" : "text-ap-tertiary",
-                      ].join(" "),
+                  "flex flex-col items-center justify-center gap-0.5 min-w-0 py-1.5 transition-all active:scale-95",
+                  active ? "text-ap-blue" : "text-ap-tertiary",
                 ].join(" ")}>
-                <span className={["leading-none", isPlay ? "text-[24px]" : "text-[22px]"].join(" ")}>{l.icon}</span>
+                <span className="leading-none text-[22px]">{l.icon}</span>
                 <span className={[
                   "text-[10px] truncate w-full text-center px-0.5 leading-tight",
-                  isPlay ? "font-bold" : active ? "font-bold" : "font-medium",
+                  active ? "font-bold" : "font-medium",
                 ].join(" ")}>
                   {l.label}
                 </span>
