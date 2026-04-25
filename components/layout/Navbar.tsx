@@ -150,7 +150,7 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
   return (
     <>
       <nav className="sticky top-0 z-50 bg-navbar-bg backdrop-blur-xl border-b border-ap-border">
-        <div className="max-w-5xl mx-auto px-3 sm:px-5 h-16 flex items-center justify-between gap-2">
+        <div className="max-w-5xl mx-auto px-3 sm:px-5 h-16 flex items-center justify-between gap-2 min-w-0">
 
           {/* Logo */}
           <Link href={`/${lang}/dashboard`} className="flex items-center flex-shrink-0 group">
@@ -159,7 +159,7 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
               alt="logo"
               width={200}
               height={200}
-              className="h-24 w-auto object-contain group-hover:opacity-90 transition-opacity"
+              className="h-12 sm:h-14 w-auto max-w-[120px] sm:max-w-[160px] object-contain group-hover:opacity-90 transition-opacity"
               priority
             />
           </Link>
@@ -352,21 +352,28 @@ export default function Navbar({ logoUrl, balance, diamond, userName, userPhone,
           {navLinks.map((l) => {
             const active = pathname === l.href || pathname.startsWith(l.href + "/");
             const isPlay = l.isCta;
-            const ctaLabel = l.label.replace(/\s*→\s*$/g, "").replace(/\s+/g, " ").trim();
             return (
               <Link key={l.href} href={l.href}
                 className={[
-                  "min-w-0 transition-all active:scale-95 flex flex-col items-center justify-center gap-0.5 py-1.5 pointer-events-auto",
+                  "flex flex-col w-100 items-center justify-center gap-0.5 min-w-0 transition-all active:scale-95",
                   isPlay
-                    ? active ? "text-ap-blue" : "text-ap-tertiary"
-                    : active ? "text-ap-blue" : "text-ap-tertiary",
+                    ? [
+                        "relative -mt-4 mb-1 mx-1 rounded-2xl py-2 shadow-lg border",
+                        active
+                          ? "bg-ap-blue text-white border-ap-blue"
+                          : "bg-ap-blue text-white border-ap-blue/70 hover:bg-ap-blue-h",
+                      ].join(" ")
+                    : [
+                        "py-1.5",
+                        active ? "text-ap-blue" : "text-ap-tertiary",
+                      ].join(" "),
                 ].join(" ")}>
-                <AppIcon name={l.icon} className="shrink-0 leading-none w-[22px] h-[22px]" />
+                <span className={["leading-none", isPlay ? "text-[24px]" : "text-[22px]"].join(" ")}>{l.icon}</span>
                 <span className={[
-                  "block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[12px] w-full text-center px-0.5 leading-none",
-                  active ? "font-bold" : "font-bold",
+                  "text-[10px] truncate w-full text-center px-0.5 leading-tight",
+                  isPlay ? "font-bold" : active ? "font-bold" : "font-medium",
                 ].join(" ")}>
-                  {isPlay ? ctaLabel : l.label}
+                  {l.label}
                 </span>
               </Link>
             );
