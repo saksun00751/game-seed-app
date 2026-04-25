@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Toast from "@/components/ui/Toast";
 import PromotionPanel from "@/components/deposit/PromotionPanel";
 import { useLang } from "@/lib/i18n/context";
+import { getTranslation } from "@/lib/i18n/getTranslation";
 
 function formatBankAccount(account: string): string {
   const digits = account.replace(/\D/g, "");
@@ -93,13 +94,13 @@ function extractAccounts(payload: LoadBankApiPayload): LoadBankAccount[] {
   return [];
 }
 
-const METHOD_META: Record<Method, { icon: string; title: string; desc: string }> = {
-  bank: { icon: "🏦", title: "ธนาคาร",     desc: "โอนผ่านบัญชีธนาคาร" },
-  tw:   { icon: "💚", title: "TrueWallet", desc: "โอนผ่านทรูวอลเล็ต" },
-};
-
 export default function DepositPageRandom({ displayName, bankName, bankLogo, bankAccount, balance, selectedPromotion }: Props) {
   const { lang } = useLang();
+  const t = getTranslation(lang, "deposit");
+  const METHOD_META: Record<Method, { icon: string; title: string; desc: string }> = {
+    bank: { icon: "🏦", title: t.methodBankTitle, desc: t.methodBankDesc },
+    tw:   { icon: "💚", title: t.methodTwTitle,   desc: t.methodTwDesc },
+  };
   const [activePromotion, setActivePromotion] = useState<ActivePromotion | null>(
     selectedPromotion?.select ? selectedPromotion : null,
   );
@@ -138,13 +139,13 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
     if (!method) return;
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) {
-      setError("กรุณากรอกจำนวนเงินให้ถูกต้อง");
+      setError(t.amountInvalid);
       return;
     }
     if (activePromotion?.select) {
       const min = parseFloat(activePromotion.min);
       if (Number.isFinite(min) && amt < min) {
-        setError(`โปรโมชั่น "${activePromotion.name}" ขั้นต่ำ ฿${min.toLocaleString("en-US")}`);
+        setError(t.promoMin.replace("{name}", activePromotion.name).replace("{amount}", min.toLocaleString("en-US")));
         return;
       }
     }
@@ -160,19 +161,19 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
       const data: LoadBankApiPayload = await res.json();
       const accounts = extractAccounts(data);
       if (!data.success || accounts.length === 0) {
-        setError(data.message ?? "ไม่สามารถโหลดบัญชีรับเงินได้");
+        setError(data.message ?? t.cantLoadAccounts);
         return;
       }
       const picked = accounts[0];
       const min = parseFloat(picked.deposit_min) || 0;
       if (amt < min) {
-        setError(`ยอดฝากขั้นต่ำ ฿${min.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+        setError(t.depositMinAmount.replace("{amount}", min.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })));
         return;
       }
       setPickedAccount(picked);
       setStep("result");
     } catch {
-      setError("ไม่สามารถเชื่อมต่อระบบได้");
+      setError(t.cantConnect);
     } finally {
       setSubmitting(false);
     }
@@ -181,9 +182,9 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
   async function handleCopy(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text.replace(/\s+/g, ""));
-      notify(`คัดลอก${label}แล้ว`, "success");
+      notify(t.copied.replace("{label}", label), "success");
     } catch {
-      notify("ไม่สามารถคัดลอกได้", "error");
+      notify(t.cantCopy, "error");
     }
   }
 
@@ -206,7 +207,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
       <div className="relative overflow-hidden bg-[linear-gradient(160deg,#ffffff_0%,#f8fbff_100%)] rounded-2xl border border-slate-200 shadow-[0_14px_30px_rgba(15,23,42,0.10)] px-5 py-4 mb-3">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(59,130,246,0.12),transparent_42%)] pointer-events-none" />
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-blue-300/60 to-transparent" />
-        <p className="relative text-[12px] text-slate-500 uppercase tracking-[0.08em] font-semibold mb-1">ยอดคงเหลือ</p>
+        <p className="relative text-[12px] text-slate-500 uppercase tracking-[0.08em] font-semibold mb-1">{t.balance}</p>
         <p className="relative text-[32px] font-extrabold text-slate-900 tabular-nums leading-tight tracking-tight">
           ฿{balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
@@ -215,13 +216,13 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
       {/* User bank info card */}
       <div className="relative bg-[linear-gradient(165deg,#ffffff_0%,#f9fbff_100%)] rounded-2xl border border-slate-200 shadow-[0_14px_30px_rgba(15,23,42,0.10)] px-5 py-4 mb-5">
         <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-blue-200/70 to-transparent" />
-        <p className="text-[12px] text-slate-500 uppercase tracking-[0.08em] font-semibold mb-2">บัญชีธนาคารของฉัน</p>
+        <p className="text-[12px] text-slate-500 uppercase tracking-[0.08em] font-semibold mb-2">{t.myBank}</p>
         {bankAccount ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
                 {bankLogo ? (
-                  <img src={bankLogo} alt={bankName ?? "ธนาคาร"} className="w-full h-full object-contain" />
+                  <img src={bankLogo} alt={bankName ?? t.bankFallback} className="w-full h-full object-contain" />
                 ) : (
                   <span className="text-[16px]" aria-hidden>🏦</span>
                 )}
@@ -236,7 +237,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
             </p>
           </div>
         ) : (
-          <p className="text-[13px] text-ap-tertiary">ยังไม่ได้ผูกบัญชีธนาคาร</p>
+          <p className="text-[13px] text-ap-tertiary">{t.noBank}</p>
         )}
       </div>
 
@@ -248,7 +249,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
       />
 
       <div className="bg-white rounded-2xl border border-ap-border p-5 shadow-sm">
-        <h1 className="text-[18px] font-extrabold text-ap-primary">ฝากเงิน</h1>
+        <h1 className="text-[18px] font-extrabold text-ap-primary">{t.title}</h1>
 
         {/* Stepper */}
         <div className="mt-4 flex items-center w-full">
@@ -258,7 +259,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
             const idx   = order.indexOf(s);
             const done  = idx < cur;
             const active = idx === cur;
-            const labels = ["เลือกช่องทาง", "กรอกจำนวนเงิน", "บัญชีรับเงิน"];
+            const labels = [t.step1, t.step2, t.step3];
             return (
               <div key={s} className={[i < 2 ? "flex-1" : "", "flex items-center"].join(" ")}>
                 <div className="flex flex-col items-center gap-1 flex-shrink-0">
@@ -275,7 +276,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
                     {labels[i]}
                   </span>
                 </div>
-                {i < 2 && <div className={["flex-1 h-0.5 mx-2 -mt-4", done ? "bg-ap-blue/40" : "bg-ap-border"].join(" ")} />}
+                {i < 2 && <div className={["flex-1 h-0.5 mx-2 -mt-4 rounded-full", done ? "bg-ap-blue" : "bg-slate-300"].join(" ")} />}
               </div>
             );
           })}
@@ -286,18 +287,18 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
           <div className="mt-5">
             {selectedPromotion?.select && (
               <div className="mb-3 rounded-xl bg-ap-blue/5 border border-ap-blue/20 px-3 py-2">
-                <p className="text-[12px] text-ap-tertiary">โปรโมชั่นที่เลือก</p>
+                <p className="text-[12px] text-ap-tertiary">{t.selectedPromo}</p>
                 <p className="text-[14px] font-bold text-ap-blue">{selectedPromotion.name}</p>
                 <p className="text-[12px] text-ap-secondary">
-                  ขั้นต่ำ ฿{(parseFloat(selectedPromotion.min) || 0).toLocaleString("en-US")}
+                  {t.minPrefix} ฿{(parseFloat(selectedPromotion.min) || 0).toLocaleString("en-US")}
                 </p>
               </div>
             )}
-            <p className="text-[14px] font-bold text-ap-primary mb-3">เลือกช่องทาง</p>
+            <p className="text-[14px] font-bold text-ap-primary mb-3">{t.step1}</p>
             {channelsLoading ? (
-              <p className="text-[13px] text-ap-tertiary">กำลังโหลด...</p>
+              <p className="text-[13px] text-ap-tertiary">{t.loading}</p>
             ) : methods.length === 0 ? (
-              <p className="text-[13px] text-ap-red">ไม่มีช่องทางที่เปิดใช้งาน</p>
+              <p className="text-[13px] text-ap-red">{t.noChannels}</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {methods.map((m) => {
@@ -330,7 +331,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
               <p className="text-[15px] font-bold text-ap-primary">{METHOD_META[method].title}</p>
             </div>
 
-            <label className="block text-[13px] font-semibold text-ap-secondary mb-1.5">จำนวนเงิน</label>
+            <label className="block text-[13px] font-semibold text-ap-secondary mb-1.5">{t.amountLabel}</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] font-bold text-ap-tertiary">฿</span>
               <input
@@ -352,7 +353,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
                 onClick={reset}
                 className="flex-1 h-12 rounded-xl border border-ap-border text-[14px] font-bold text-ap-secondary hover:bg-ap-bg transition-colors"
               >
-                ย้อนกลับ
+                {t.back}
               </button>
               <button
                 type="button"
@@ -360,7 +361,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
                 disabled={submitting}
                 className="flex-1 h-12 rounded-xl bg-ap-blue text-white text-[14px] font-bold shadow-sm hover:bg-ap-blue-h active:scale-[0.98] transition-all disabled:opacity-60"
               >
-                {submitting ? "กำลังสุ่มบัญชี..." : "ถัดไป"}
+                {submitting ? t.drawing : t.next}
               </button>
             </div>
           </div>
@@ -370,7 +371,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
         {step === "result" && pickedAccount && (
           <div className="mt-5">
             <div className="rounded-2xl bg-ap-blue/5 border border-ap-blue/20 px-3 py-2 mb-3">
-              <p className="text-[12px] text-ap-tertiary">โอนจำนวน</p>
+              <p className="text-[12px] text-ap-tertiary">{t.transferAmount}</p>
               <p className="text-[20px] font-extrabold text-ap-blue tabular-nums">
                 ฿{Number(amount).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
@@ -391,17 +392,17 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
 
               <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-white border border-ap-border px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] text-ap-tertiary uppercase tracking-wide leading-none">เลขบัญชี</p>
+                  <p className="text-[11px] text-ap-tertiary uppercase tracking-wide leading-none">{t.accountNumber}</p>
                   <p className="mt-1 text-[18px] font-mono font-bold text-ap-primary tracking-wider leading-none break-all">
                     {pickedAccount.acc_no}
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleCopy(pickedAccount.acc_no, "เลขบัญชี")}
+                  onClick={() => handleCopy(pickedAccount.acc_no, t.accountNumber)}
                   className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-ap-blue text-white text-[12px] font-bold shadow-sm hover:bg-ap-blue-h active:scale-95 transition-all flex-shrink-0"
                 >
-                  คัดลอก
+                  {t.copy}
                 </button>
               </div>
 
@@ -413,7 +414,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
 
               {pickedAccount.qrcode && pickedAccount.qr_pic && (
                 <div className="mt-3 flex flex-col items-center gap-2 rounded-xl bg-white border border-ap-border p-3">
-                  <p className="text-[12px] font-bold text-ap-tertiary uppercase tracking-wide">สแกน QR Code</p>
+                  <p className="text-[12px] font-bold text-ap-tertiary uppercase tracking-wide">{t.scanQr}</p>
                   <img
                     src={pickedAccount.qr_pic}
                     alt="QR Code"
@@ -425,7 +426,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
 
             <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
               <p className="text-[12px] text-amber-700">
-                ⚠️ กรุณาโอนตามจำนวนที่ระบุ และใช้บัญชีที่ลงทะเบียนไว้เท่านั้น
+                {t.transferWarning}
               </p>
             </div>
 
@@ -436,14 +437,14 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
                 onClick={() => setStep("amount")}
                 className="flex-1 h-12 rounded-xl border border-ap-border text-[14px] font-bold text-ap-secondary hover:bg-ap-bg transition-colors"
               >
-                ย้อนกลับ
+                {t.back}
               </button>
               <button
                 type="button"
                 onClick={reset}
                 className="flex-1 h-12 rounded-xl bg-ap-blue text-white text-[14px] font-bold shadow-sm hover:bg-ap-blue-h active:scale-[0.98] transition-all"
               >
-                เริ่มใหม่
+                {t.transferSuccess}
               </button>
             </div>
           </div>

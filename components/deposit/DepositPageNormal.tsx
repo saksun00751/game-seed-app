@@ -3,6 +3,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n/context";
+import { getTranslation } from "@/lib/i18n/getTranslation";
+
+type DepositT = Record<string, string>;
+
 import HScrollRow from "@/components/ui/HScrollRow";
 import Toast from "@/components/ui/Toast";
 
@@ -368,12 +372,14 @@ interface DepositChannels {
 
 type ChannelKey = "bank" | "payment" | "tw" | "slip";
 
-const CHANNEL_META: Record<ChannelKey, { icon: string; title: string; desc: string; color: string }> = {
-  bank:    { icon: "🏦", title: "ธนาคาร",     desc: "โอนผ่านบัญชีธนาคาร",     color: "ap-blue"  },
-  tw:      { icon: "💚", title: "TrueWallet", desc: "โอนผ่านทรูวอลเล็ต",       color: "green"    },
-  slip:    { icon: "📎", title: "Slip",       desc: "อัปโหลดสลิป",             color: "ap-blue"  },
-  payment: { icon: "💳", title: "Payment",    desc: "ชำระผ่าน Payment Gateway", color: "purple"   },
-};
+function buildChannelMeta(t: DepositT): Record<ChannelKey, { icon: string; title: string; desc: string; color: string }> {
+  return {
+    bank:    { icon: "🏦", title: t.methodBankTitle,    desc: t.methodBankDesc,    color: "ap-blue"  },
+    tw:      { icon: "💚", title: t.methodTwTitle,      desc: t.methodTwDesc,      color: "green"    },
+    slip:    { icon: "📎", title: t.methodSlipTitle,    desc: t.methodSlipDesc,    color: "ap-blue"  },
+    payment: { icon: "💳", title: t.methodPaymentTitle, desc: t.methodPaymentDesc, color: "purple"   },
+  };
+}
 
 // ─── Bank account card ─────────────────────────────────────────────────────────
 function BankCard({
@@ -381,11 +387,13 @@ function BankCard({
   selected,
   onClick,
   onCopy,
+  t,
 }: {
   account: LoadBankAccount;
   selected: boolean;
   onClick: () => void;
   onCopy: (accountNo: string) => void;
+  t: DepositT;
 }) {
   const minAmt = parseFloat(account.deposit_min) || 0;
   return (
@@ -419,7 +427,7 @@ function BankCard({
         </div>
         {minAmt > 0 && (
           <span className="hidden sm:inline-block text-[13px] text-ap-tertiary flex-shrink-0">
-            ขั้นต่ำ ฿{minAmt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {t.minPrefix} ฿{minAmt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         )}
       </div>
@@ -427,7 +435,7 @@ function BankCard({
       {/* Account number + copy button */}
       <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-ap-bg/70 border border-ap-border/70 px-3 py-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] text-ap-tertiary uppercase tracking-wide leading-none">เลขบัญชี</p>
+          <p className="text-[11px] text-ap-tertiary uppercase tracking-wide leading-none">{t.accountNumber}</p>
           <p className="mt-1 text-[17px] sm:text-[18px] font-mono font-bold text-ap-primary tracking-wider leading-none break-all">
             {account.acc_no}
           </p>
@@ -440,20 +448,20 @@ function BankCard({
             onCopy(account.acc_no);
           }}
           className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-ap-blue text-white text-[12px] font-bold shadow-sm hover:bg-ap-blue-h active:scale-95 transition-all flex-shrink-0"
-          aria-label="คัดลอกเลขบัญชี"
+          aria-label={t.copyAccount}
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <rect x="9" y="9" width="10" height="10" rx="2" />
             <path d="M5 15V7a2 2 0 0 1 2-2h8" />
           </svg>
-          คัดลอก
+          {t.copy}
         </button>
       </div>
 
       {/* Mobile-only: minimum amount row */}
       {minAmt > 0 && (
         <p className="sm:hidden mt-2 text-[13px] text-ap-tertiary">
-          ขั้นต่ำ ฿{minAmt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {t.minPrefix} ฿{minAmt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       )}
 
@@ -463,7 +471,7 @@ function BankCard({
 
       {account.qrcode && account.qr_pic && (
         <div className="mt-3 flex flex-col items-center gap-2 rounded-xl bg-white border border-ap-border p-3">
-          <p className="text-[12px] font-bold text-ap-tertiary uppercase tracking-wide">สแกน QR Code</p>
+          <p className="text-[12px] font-bold text-ap-tertiary uppercase tracking-wide">{t.scanQr}</p>
           <img
             src={account.qr_pic}
             alt="QR Code"
@@ -476,18 +484,18 @@ function BankCard({
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
-function Notes() {
+function Notes({ t }: { t: DepositT }) {
   return (
     <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-2.5">
         <span className="text-[18px]">⚠️</span>
-        <p className="text-[14px] font-bold text-amber-700 uppercase tracking-wide">หมายเหตุสำคัญ</p>
+        <p className="text-[14px] font-bold text-amber-700 uppercase tracking-wide">{t.noteTitle}</p>
       </div>
       <div className="space-y-1.5">
         {[
-          { bold: true,  text: "ใช้บัญชีที่ลงทะเบียนไว้ในการฝากเงินเท่านั้น !!!!" },
-          { bold: false, text: "หลังจากฝากเงินสำเร็จ รอไม่เกิน 1–3 นาที" },
-          { bold: false, text: "หากพบปัญหาติดต่อฝ่ายบริการลูกค้า" },
+          { bold: true,  text: t.noteUseRegistered },
+          { bold: false, text: t.noteWaitMinutes },
+          { bold: false, text: t.noteContactSupport },
         ].map((n, i) => (
           <div key={i} className="flex items-start gap-2">
             <span className="text-amber-500 text-[14px] mt-0.5 flex-shrink-0">•</span>
@@ -504,6 +512,8 @@ function Notes() {
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function DepositPageNormal({ displayName, bankName, bankLogo, bankAccount, balance, selectedPromotion }: Props) {
   const { lang } = useLang();
+  const t = getTranslation(lang, "deposit") as DepositT;
+  const CHANNEL_META = buildChannelMeta(t);
 
   const [method,      setMethod]      = useState<ChannelKey | null>(null);
   const [showResult,  setShowResult]  = useState(false);
@@ -557,9 +567,9 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       .then((r) => r.json())
       .then((data) => {
         if (data.success && data.data?.deposit) setChannels(data.data.deposit);
-        else setChannelsError(data.message ?? "ไม่สามารถโหลดช่องทางฝากเงินได้");
+        else setChannelsError(data.message ?? t.channelsError);
       })
-      .catch(() => setChannelsError("ไม่สามารถเชื่อมต่อระบบได้"))
+      .catch(() => setChannelsError(t.cantConnect))
       .finally(() => setChannelsLoading(false));
   }, []);
 
@@ -595,9 +605,9 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
     const digits = accountNo.replace(/\s+/g, "");
     try {
       await navigator.clipboard.writeText(digits);
-      showFeedback("คัดลอกเลขบัญชีแล้ว", "success");
+      showFeedback(t.copyAccountSuccess, "success");
     } catch {
-      showFeedback("ไม่สามารถคัดลอกเลขบัญชีได้", "error");
+      showFeedback(t.copyAccountFail, "error");
     }
   }
 
@@ -668,7 +678,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
           setPayments(list);
           setSelectedPayment(list[0]);
         } else {
-          setBankError(data.message ?? "ไม่สามารถโหลดข้อมูลช่องทาง Payment ได้");
+          setBankError(data.message ?? t.cantLoadPayment);
         }
       } else {
         const accounts = extractAccounts(data as LoadBankApiPayload);
@@ -676,11 +686,11 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
           setBankAccounts(accounts);
           setSelectedBank(accounts[0]);
         } else {
-          setBankError(data.message ?? "ไม่สามารถโหลดข้อมูลบัญชีได้");
+          setBankError(data.message ?? t.cantLoadAccounts);
         }
       }
     } catch {
-      setBankError("ไม่สามารถเชื่อมต่อระบบได้");
+      setBankError(t.cantConnect);
     } finally {
       setBankLoading(false);
     }
@@ -712,19 +722,19 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       } catch {
         createData = {
           success: false,
-          message: "ไม่สามารถอ่านข้อมูล response ได้ (ไม่ใช่ JSON)",
+          message: t.cantConnect,
           status: createRes.status,
         };
       }
 
       if (!createRes.ok || isApiSuccessFalse(createData)) {
-        setBankError(pickErrorMessage(createData, "ไม่สามารถสร้างรายการฝากเงินได้"));
+        setBankError(pickErrorMessage(createData, t.cantConnect));
         return;
       }
 
       const requestId = pickRequestId(createData);
       if (!requestId) {
-        setBankError("ไม่พบ request_id จากขั้นตอน create");
+        setBankError(t.cantConnect);
         return;
       }
 
@@ -738,26 +748,26 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       } catch {
         qrData = {
           success: false,
-          message: "ไม่สามารถอ่านข้อมูล QR response ได้ (ไม่ใช่ JSON)",
+          message: t.cantConnect,
           status: qrRes.status,
         };
       }
 
       if (!qrRes.ok || isApiSuccessFalse(qrData)) {
-        setBankError(pickErrorMessage(qrData, "ไม่สามารถโหลด QR Code ได้"));
+        setBankError(pickErrorMessage(qrData, t.cantConnect));
         return;
       }
 
       const normalized = normalizeQrData(qrData);
       if (!normalized) {
-        setBankError("รูปแบบข้อมูล QR ไม่ถูกต้อง หรือไม่มี qrcode");
+        setBankError(t.cantConnect);
         return;
       }
 
       setQrCodeData(normalized);
       setShowResult(true);
     } catch {
-      setBankError("ไม่สามารถเชื่อมต่อระบบได้");
+      setBankError(t.cantConnect);
     } finally {
       setPaymentSubmitting(false);
     }
@@ -830,13 +840,13 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
         const status = pickDepositStatus(payload);
         if (isPaidLikeStatus(status)) {
           setStatusSettledTxids((prev) => ({ ...prev, [txid]: true }));
-          setStatusModal({ kind: "success", message: "ชำระเงินสำเร็จ กำลังพากลับหน้าแรก..." });
+          setStatusModal({ kind: "success", message: t.paidRedirect });
           return;
         }
 
         if (isExpiredStatus(status)) {
           setStatusSettledTxids((prev) => ({ ...prev, [txid]: true }));
-          setStatusModal({ kind: "expired", message: "รายการหมดอายุ กำลังพากลับหน้าแรก..." });
+          setStatusModal({ kind: "expired", message: t.expiredRedirect });
           return;
         }
       } catch {}
@@ -895,7 +905,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       } catch {}
 
       const ok = Boolean(res.ok && payload.success);
-      const message = payload.message?.trim() || (ok ? "รับโปรโมชั่นสำเร็จ" : "ไม่สามารถรับโปรโมชั่นได้");
+      const message = payload.message?.trim() || (ok ? t.promoSelected : t.cantSelectPromo);
       if (!ok) {
         showFeedback(message, "error");
         return;
@@ -904,7 +914,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       await refreshActivePromotion();
       showFeedback(message, "success");
     } catch {
-      showFeedback("ไม่สามารถเชื่อมต่อระบบได้", "error");
+      showFeedback(t.cantConnect, "error");
     } finally {
       setPromoSubmittingId(null);
     }
@@ -915,11 +925,11 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
     e.target.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      showFeedback("กรุณาเลือกไฟล์รูปภาพ", "error");
+      showFeedback(t.fileTypeError, "error");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      showFeedback("ขนาดไฟล์ต้องไม่เกิน 5MB", "error");
+      showFeedback(t.fileSizeError, "error");
       return;
     }
     setSlipFile(file);
@@ -937,12 +947,12 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
 
   async function submitSlip() {
     if (!slipFile) {
-      showFeedback("กรุณาอัปโหลดสลิป", "error");
+      showFeedback(t.pleaseUploadSlip, "error");
       return;
     }
     const amount = Number(slipAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      showFeedback("กรุณากรอกจำนวนเงิน", "error");
+      showFeedback(t.pleaseEnterAmount, "error");
       return;
     }
 
@@ -964,7 +974,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       try { payload = await res.json(); } catch {}
 
       const ok = Boolean(res.ok && payload.success);
-      const message = payload.message?.trim() || (ok ? "ส่งสลิปสำเร็จ รอระบบตรวจสอบ" : "ไม่สามารถส่งสลิปได้");
+      const message = payload.message?.trim() || (ok ? t.slipSent : t.cantSendSlip);
 
       if (!ok) {
         showFeedback(message, "error");
@@ -975,7 +985,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       clearSlip();
       setSlipAmount("");
     } catch {
-      showFeedback("ไม่สามารถเชื่อมต่อระบบได้", "error");
+      showFeedback(t.cantConnect, "error");
     } finally {
       setSlipSubmitting(false);
     }
@@ -996,7 +1006,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       } catch {}
 
       const ok = Boolean(res.ok && payload.success);
-      const message = payload.message?.trim() || (ok ? "ยกเลิกโปรโมชั่นสำเร็จ" : "ไม่สามารถยกเลิกโปรโมชั่นได้");
+      const message = payload.message?.trim() || (ok ? t.promoCanceled : t.cantCancelPromo);
       if (!ok) {
         showFeedback(message, "error");
         return;
@@ -1005,7 +1015,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       await refreshActivePromotion();
       showFeedback(message, "success");
     } catch {
-      showFeedback("ไม่สามารถเชื่อมต่อระบบได้", "error");
+      showFeedback(t.cantConnect, "error");
     } finally {
       setPromoDeselecting(false);
     }
@@ -1018,7 +1028,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       <div className="relative overflow-hidden bg-[linear-gradient(160deg,#ffffff_0%,#f8fbff_100%)] rounded-2xl border border-slate-200 shadow-[0_14px_30px_rgba(15,23,42,0.10)] px-5 py-4 mb-3">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(59,130,246,0.12),transparent_42%)] pointer-events-none" />
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-blue-300/60 to-transparent" />
-        <p className="relative text-[12px] text-slate-500 uppercase tracking-[0.08em] font-semibold mb-1">ยอดคงเหลือ</p>
+        <p className="relative text-[12px] text-slate-500 uppercase tracking-[0.08em] font-semibold mb-1">{t.balance}</p>
         <p className="relative text-[32px] font-extrabold text-slate-900 tabular-nums leading-tight tracking-tight">
           ฿{balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
@@ -1027,13 +1037,13 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       {/* User bank info card */}
       <div className="relative bg-[linear-gradient(165deg,#ffffff_0%,#f9fbff_100%)] rounded-2xl border border-slate-200 shadow-[0_14px_30px_rgba(15,23,42,0.10)] px-5 py-4 mb-5">
         <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-blue-200/70 to-transparent" />
-        <p className="text-[12px] text-slate-500 uppercase tracking-[0.08em] font-semibold mb-2">บัญชีธนาคารของฉัน</p>
+        <p className="text-[12px] text-slate-500 uppercase tracking-[0.08em] font-semibold mb-2">{t.myBank}</p>
         {bankAccount ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
                 {bankLogo ? (
-                  <img src={bankLogo} alt={bankName ?? "ธนาคาร"} className="w-full h-full object-contain" />
+                  <img src={bankLogo} alt={bankName ?? t.bankFallback} className="w-full h-full object-contain" />
                 ) : (
                   <span className="text-[16px]" aria-hidden>🏦</span>
                 )}
@@ -1048,7 +1058,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
             </p>
           </div>
         ) : (
-          <p className="text-[13px] text-ap-tertiary">ยังไม่ได้ผูกบัญชีธนาคาร</p>
+          <p className="text-[13px] text-ap-tertiary">{t.noBank}</p>
         )}
       </div>
 
@@ -1056,9 +1066,9 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
         <div className="relative bg-[linear-gradient(165deg,#ffffff_0%,#f9fbff_100%)] rounded-2xl border border-slate-200 shadow-[0_14px_30px_rgba(15,23,42,0.10)] px-5 py-4 mb-5">
           <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-blue-200/70 to-transparent" />
           <div className="flex items-center justify-between mb-2.5">
-            <p className="text-[14px] text-ap-tertiary uppercase tracking-wide font-medium">รายการโปรโมชั่น</p>
+            <p className="text-[14px] text-ap-tertiary uppercase tracking-wide font-medium">{t.promoList}</p>
             <Link href={`/${lang}/promotion`} className="text-[12px] font-semibold text-ap-blue hover:text-ap-blue-h transition-colors">
-              ดูทั้งหมด
+              {t.viewAll}
             </Link>
           </div>
 
@@ -1095,12 +1105,12 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         {bonusPercent > 0 && (
                           <span className="text-[11px] font-bold text-ap-blue bg-ap-blue/10 rounded-full px-2 py-0.5">
-                            โบนัส {bonusPercent}%
+                            {t.bonusPercent.replace("{percent}", String(bonusPercent))}
                           </span>
                         )}
                         {minDeposit > 0 && (
                           <span className="text-[11px] text-ap-tertiary">
-                            ขั้นต่ำ ฿{minDeposit.toLocaleString("en-US")}
+                            {t.minDeposit.replace("{amount}", minDeposit.toLocaleString("en-US"))}
                           </span>
                         )}
                       </div>
@@ -1111,7 +1121,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                           disabled={!promoCode || promoSubmittingId === promoCode || promoDeselecting}
                           className="inline-flex items-center justify-center px-3 py-2 rounded-full bg-ap-blue text-white text-[12px] font-semibold hover:bg-ap-blue-h transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {promoSubmittingId === promoCode ? "กำลังรับ..." : "รับโปร"}
+                          {promoSubmittingId === promoCode ? t.receivingPromo : t.receivePromo}
                         </button>
                       </div>
                     </div>
@@ -1128,10 +1138,10 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
           <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-blue-200/70 to-transparent" />
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[12px] text-ap-tertiary uppercase tracking-wide font-medium mb-1">โปรโมชั่นที่รับอยู่</p>
+              <p className="text-[12px] text-ap-tertiary uppercase tracking-wide font-medium mb-1">{t.activePromo}</p>
               <p className="text-[15px] font-semibold text-ap-primary leading-snug">{activePromotion.name}</p>
               <p className="text-[13px] text-ap-secondary mt-1">
-                ยอดขั้นต่ำ ฿{(Number(activePromotion.min) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {t.minAmountLabel} ฿{(Number(activePromotion.min) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
             <button
@@ -1140,7 +1150,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
               disabled={promoDeselecting || !!promoSubmittingId}
               className="px-3 py-2 rounded-full border border-ap-red/30 bg-red-50 text-red-600 text-[12px] font-semibold hover:bg-red-100 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {promoDeselecting ? "กำลังยกเลิก..." : "ยกเลิกโปร"}
+              {promoDeselecting ? t.cancelingPromo : t.cancelPromo}
             </button>
           </div>
         </div>
@@ -1150,12 +1160,12 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       <div className="relative bg-[linear-gradient(165deg,#ffffff_0%,#f8fbff_100%)] rounded-3xl border border-slate-200 shadow-[0_16px_34px_rgba(15,23,42,0.12)] p-5">
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-blue-300/70 to-transparent" />
         <div className="space-y-3 animate-fade-up">
-          <h2 className="text-[17px] font-bold text-slate-900 mb-1">เลือกวิธีฝากเงิน</h2>
+          <h2 className="text-[17px] font-bold text-slate-900 mb-1">{t.chooseMethod}</h2>
 
           {channelsLoading && (
             <div className="flex items-center gap-2 py-2">
               <div className="w-4 h-4 rounded-full border-2 border-ap-blue border-t-transparent animate-spin" />
-              <p className="text-[13px] text-ap-secondary">กำลังโหลดช่องทางฝากเงิน...</p>
+              <p className="text-[13px] text-ap-secondary">{t.loadingChannels}</p>
             </div>
           )}
           {channelsError && !channelsLoading && (
@@ -1164,7 +1174,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
             </div>
           )}
           {!channelsLoading && !channelsError && enabledChannels.length === 0 && (
-            <p className="text-[13px] text-ap-tertiary py-2 text-center">ไม่มีช่องทางฝากเงินที่เปิดใช้งาน</p>
+            <p className="text-[13px] text-ap-tertiary py-2 text-center">{t.noEnabledChannels}</p>
           )}
 
           {!channelsLoading && !channelsError && enabledChannels.length > 0 && (
@@ -1216,13 +1226,13 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
           <div className="mt-5 pt-4 border-t border-slate-200 space-y-4 animate-fade-up">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[20px]">{CHANNEL_META[method].icon}</span>
-              <h2 className="text-[16px] font-bold text-ap-primary">ข้อมูลช่องทางฝากเงิน</h2>
+              <h2 className="text-[16px] font-bold text-ap-primary">{t.channelInfo}</h2>
             </div>
 
             {bankLoading && (
               <div className="flex items-center gap-2 py-3">
                 <div className="w-4 h-4 rounded-full border-2 border-ap-blue border-t-transparent animate-spin" />
-                <p className="text-[13px] text-ap-secondary">กำลังโหลดข้อมูลช่องทาง...</p>
+                <p className="text-[13px] text-ap-secondary">{t.loadingChannelInfo}</p>
               </div>
             )}
 
@@ -1235,7 +1245,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
             {!bankLoading && method !== "payment" && bankAccounts.length > 0 && (
               <div className="space-y-2">
                 <p className="text-[14px] font-bold text-ap-secondary uppercase tracking-wide">
-                  {method === "tw" ? "โอนมาที่หมายเลขนี้" : "โอนเงินมาที่บัญชีนี้"}
+                  {method === "tw" ? t.transferToTw : t.transferToAccount}
                 </p>
                 {bankAccounts.map((acc) => (
                   <BankCard
@@ -1244,6 +1254,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                     selected={selectedBank?.code === acc.code}
                     onClick={() => setSelectedBank(acc)}
                     onCopy={handleCopyAccount}
+                    t={t}
                   />
                 ))}
               </div>
@@ -1252,12 +1263,12 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
             {!bankLoading && method === "slip" && (
               <div className="space-y-3 pt-2 border-t border-slate-200">
                 <p className="text-[14px] font-bold text-ap-secondary uppercase tracking-wide">
-                  อัปโหลดสลิปโอนเงิน
+                  {t.uploadSlip}
                 </p>
 
                 <div>
                   <label className="block text-[13px] font-semibold text-ap-secondary mb-1.5">
-                    จำนวนเงินที่โอน
+                    {t.transferredAmount}
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] text-ap-tertiary pointer-events-none">฿</span>
@@ -1275,25 +1286,25 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
 
                 <div>
                   <label className="block text-[13px] font-semibold text-ap-secondary mb-1.5">
-                    รูปสลิป
+                    {t.slipImage}
                   </label>
                   {slipPreview ? (
                     <div className="relative rounded-2xl border-2 border-ap-border overflow-hidden bg-white">
                       <img
                         src={slipPreview}
-                        alt="สลิปที่อัปโหลด"
+                        alt={t.slipImage}
                         className="w-full max-h-[420px] object-contain bg-slate-50"
                       />
                       <button
                         type="button"
                         onClick={clearSlip}
                         className="absolute top-2 right-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-black/60 text-white text-[12px] font-semibold hover:bg-black/80 transition-colors"
-                        aria-label="ลบรูปสลิป"
+                        aria-label={t.deleteImage}
                       >
                         <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
                           <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
                         </svg>
-                        ลบ
+                        {t.deleteImage}
                       </button>
                       <div className="px-3 py-2 bg-white border-t border-ap-border">
                         <p className="text-[12px] text-ap-tertiary truncate">
@@ -1307,8 +1318,8 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                       <div className="w-12 h-12 rounded-full bg-ap-blue/10 flex items-center justify-center text-[22px]">
                         📎
                       </div>
-                      <p className="text-[14px] font-semibold text-ap-primary">แตะเพื่ออัปโหลดสลิป</p>
-                      <p className="text-[12px] text-ap-tertiary">รองรับ JPG, PNG ขนาดไม่เกิน 5MB</p>
+                      <p className="text-[14px] font-semibold text-ap-primary">{t.uploadHere}</p>
+                      <p className="text-[12px] text-ap-tertiary">{t.supportFormat}</p>
                       <input
                         type="file"
                         accept="image/*"
@@ -1330,7 +1341,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                   }
                   className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#0a68d8] to-[#1a87ea] text-white text-[14px] font-semibold hover:brightness-105 transition-all disabled:opacity-40 shadow-[0_10px_22px_rgba(37,99,235,0.24)]"
                 >
-                  {slipSubmitting ? "กำลังส่งสลิป..." : "ยืนยันการฝากเงิน"}
+                  {slipSubmitting ? t.sendingSlip : t.confirmDeposit}
                 </button>
               </div>
             )}
@@ -1338,7 +1349,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
             {!bankLoading && method === "payment" && payments.length > 0 && (
               <div className="space-y-3">
                 <p className="text-[14px] font-bold text-ap-secondary uppercase tracking-wide">
-                  เลือกช่องทาง Payment
+                  {t.choosePayment}
                 </p>
                 <div className="space-y-2">
                   {payments.map((p) => {
@@ -1362,7 +1373,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                           </div>
                           {p.min_deposit > 0 && (
                             <span className="text-[12px] text-slate-500">
-                              ขั้นต่ำ ฿{p.min_deposit.toLocaleString("en-US")}
+                              {t.minPrefix} ฿{p.min_deposit.toLocaleString("en-US")}
                             </span>
                           )}
                         </div>
@@ -1377,7 +1388,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                 {selectedPayment && (
                   <div className="pt-1 space-y-2">
                     <label className="block text-[14px] font-bold text-ap-secondary uppercase tracking-wide">
-                      จำนวนเงิน ({selectedPayment.name})
+                      {t.amountFor} ({selectedPayment.name})
                     </label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] text-ap-tertiary pointer-events-none">฿</span>
@@ -1393,7 +1404,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                     </div>
                     {selectedPayment.min_deposit > 0 && (
                       <p className="text-[12px] text-ap-tertiary">
-                        ยอดฝากขั้นต่ำ ฿{selectedPayment.min_deposit.toLocaleString("en-US")}
+                        {t.depositMinAmount.replace("{amount}", selectedPayment.min_deposit.toLocaleString("en-US"))}
                       </p>
                     )}
                     <button
@@ -1406,7 +1417,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                       }
                       className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#0a68d8] to-[#1a87ea] text-white text-[14px] font-semibold hover:brightness-105 transition-all disabled:opacity-40 shadow-[0_10px_22px_rgba(37,99,235,0.24)]"
                     >
-                      {paymentSubmitting ? "กำลังสร้าง QR..." : "สร้าง QR สำหรับชำระเงิน"}
+                      {paymentSubmitting ? t.creatingQr : t.createQr}
                     </button>
                   </div>
                 )}
@@ -1420,9 +1431,9 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
             {method === "payment" && qrCodeData && qrImageSrc ? (
               <div className="space-y-3">
                 <div className="rounded-2xl border border-ap-blue/20 bg-ap-blue/[0.03] p-4">
-                  <p className="text-[16px] font-bold text-ap-primary">สแกน QR เพื่อชำระเงิน</p>
+                  <p className="text-[16px] font-bold text-ap-primary">{t.scanQrToPay}</p>
                   <p className="text-[13px] text-ap-secondary mt-1">
-                    กรุณาชำระภายในเวลาที่กำหนด และรอระบบตรวจสอบอัตโนมัติ
+                    {t.payWithin}
                   </p>
                 </div>
 
@@ -1436,10 +1447,10 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                   </div>
                   <p className="mt-2 text-center text-[13px] font-semibold text-red-600">
                     {countdownSec === null
-                      ? "ไม่พบเวลาหมดอายุ"
+                      ? t.expiryNotFound
                       : countdownSec > 0
-                        ? `หมดเวลาใน ${formatCountdown(countdownSec)}`
-                        : "QR หมดอายุแล้ว"}
+                        ? t.expiresIn.replace("{time}", formatCountdown(countdownSec))
+                        : t.qrExpired}
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[13px]">
@@ -1450,7 +1461,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                       </p>
                     </div>
                     <div className="rounded-xl bg-ap-bg px-3 py-2">
-                      <p className="text-ap-tertiary">หมดอายุ</p>
+                      <p className="text-ap-tertiary">{t.expiryField}</p>
                       <p className="font-semibold text-ap-primary">{qrCodeData.expired_date || "-"}</p>
                     </div>
                     <div className="rounded-xl bg-ap-bg px-3 py-2 sm:col-span-2">
@@ -1476,26 +1487,26 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                 }}
                 className="flex-1 py-3 rounded-full border-2 border-ap-border text-[14px] font-semibold text-ap-secondary hover:border-ap-blue/30 transition-colors"
               >
-                เลือกช่องทางใหม่
+                {t.chooseNewChannel}
               </button>
               <a
                 href={`/${lang}/transactions`}
                 className="flex-1 flex items-center justify-center py-3 rounded-2xl bg-ap-blue text-white text-[14px] font-semibold hover:bg-ap-blue-h transition-colors"
               >
-                ไปหน้า การเงิน
+                {t.goToFinance}
               </a>
             </div>
           </div>
         )}
       </div>
 
-      <Notes />
+      <Notes t={t} />
 
       {statusModal && (
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center px-5">
           <div className="w-full max-w-sm bg-white rounded-2xl border border-ap-border shadow-card p-5">
             <p className="text-[17px] font-bold text-ap-primary">
-              {statusModal.kind === "success" ? "ฝากเงินสำเร็จ" : "รายการหมดอายุ"}
+              {statusModal.kind === "success" ? t.depositSuccess : t.expired}
             </p>
             <p className="text-[14px] text-ap-secondary mt-2">
               {statusModal.message}
@@ -1505,7 +1516,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
               onClick={() => { window.location.href = `/${lang}`; }}
               className="mt-4 w-full py-3 rounded-2xl bg-ap-blue text-white text-[14px] font-semibold hover:bg-ap-blue-h transition-colors"
             >
-              ไปหน้าแรก
+              {t.goHome}
             </button>
           </div>
         </div>

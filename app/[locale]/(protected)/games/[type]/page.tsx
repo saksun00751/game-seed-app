@@ -38,7 +38,7 @@ export default async function GamesTypePage({ params }: Props) {
         <div className="bg-white rounded-2xl border border-ap-border shadow-card overflow-hidden">
           {/* Card header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-ap-border">
-            <Link href={`/${locale}/bet`}
+            <Link href={`/${locale}/dashboard`}
               className="w-8 h-8 rounded-full bg-ap-bg border border-ap-border flex items-center justify-center text-ap-secondary hover:bg-gray-200 transition-colors">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M15 18l-6-6 6-6" />
@@ -54,12 +54,59 @@ export default async function GamesTypePage({ params }: Props) {
               <span className="text-[48px]">{meta.emoji}</span>
               <p className="text-[13px] text-ap-tertiary">{t.noProviders}</p>
             </div>
+          ) : gameType === "CARDGROUP" ? (
+            (() => {
+              const SUB_META: Record<string, { label: string; emoji: string }> = {
+                card:  { label: "เกมไพ่",     emoji: "🃏" },
+                poker: { label: "โป๊กเกอร์", emoji: "♠️" },
+                keno:  { label: "คีโน่",       emoji: "🎱" },
+              };
+              const subOrder = ["card", "poker", "keno"];
+              const grouped = subOrder
+                .map((sub) => ({
+                  sub,
+                  meta: SUB_META[sub],
+                  items: games.filter((g) => g.game_type === sub),
+                }))
+                .filter((s) => s.items.length > 0);
+              return (
+                <div className="divide-y divide-ap-border">
+                  {grouped.map((s) => (
+                    <div key={s.sub} className="p-3">
+                      <div className="flex items-center gap-2 px-1 pb-2">
+                        <span className="text-[14px]">{s.meta.emoji}</span>
+                        <h2 className="text-[13px] font-bold text-ap-primary">{s.meta.label}</h2>
+                        <span className="text-[11px] text-ap-secondary">({s.items.length})</span>
+                      </div>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                        {s.items.map((g) => (
+                          <Link
+                            key={`${g.game_type}-${g.id}`}
+                            href={`/${locale}/games/${g.game_type}/${g.id.toLowerCase()}`}
+                            className="group flex flex-col items-center gap-2 text-center active:scale-[0.97] transition-all"
+                          >
+                            <div className="w-full aspect-[3/5] rounded-2xl overflow-hidden flex items-center justify-center">
+                              <img
+                                src={g.filepic}
+                                alt={g.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                            </div>
+                            <p className="text-[11px] font-semibold text-ap-primary leading-tight line-clamp-2 w-full">{g.name}</p>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 p-3">
               {games.map((g) => (
                 <Link
                   key={g.id}
-                  href={`/${locale}/games/${type}/${g.id.toLowerCase()}`}
+                  href={`/${locale}/games/${g.game_type}/${g.id.toLowerCase()}`}
                   className="group flex flex-col items-center gap-2 text-center active:scale-[0.97] transition-all"
                 >
                   <div className="w-full aspect-[3/5] rounded-2xl overflow-hidden flex items-center justify-center">

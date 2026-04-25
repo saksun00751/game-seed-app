@@ -128,13 +128,32 @@ export async function getProvidersByTypeFromApi(
   token?: string,
   lang?: string
 ): Promise<GameProviderItem[]> {
-  const res = await apiGet<ApiProvidersResponse>(`/games/providers/${gameType.toLowerCase()}`, token, lang);
-  return extractProviders(res?.data)
-    .filter((p) => !p.status || p.status === "ACTIVE")
-    .map((p) => ({
-      id:        p.provider,
-      name:      p.providerName,
-      filepic:   p.logoURL ?? "",
-      game_type: gameType.toLowerCase(),
-    }));
+  const key = gameType.toLowerCase();
+  const typeIds = key === "cardgroup" ? CARD_GROUP_IDS : [key];
+
+  const results = await Promise.allSettled(
+    typeIds.map((id) =>
+      apiGet<ApiProvidersResponse>(`/games/providers/${id}`, token, lang).then((res) => ({
+        typeId:    id,
+        providers: extractProviders(res?.data),
+      }))
+    )
+  );
+
+  const out: GameProviderItem[] = [];
+  for (const r of results) {
+    if (r.status !== "fulfilled") continue;
+    const { typeId, providers } = r.value;
+    out.push(
+      ...providers
+        .filter((p) => !p.status || p.status === "ACTIVE")
+        .map((p) => ({
+          id:        p.provider,
+          name:      p.providerName,
+          filepic:   p.logoURL ?? "",
+          game_type: typeId,
+        }))
+    );
+  }
+  return out;
 }
