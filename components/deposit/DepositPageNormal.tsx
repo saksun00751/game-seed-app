@@ -387,7 +387,7 @@ function BankCard({
   onClick: () => void;
   onCopy: (accountNo: string) => void;
 }) {
-  const minAmt = Math.max(parseFloat(account.deposit_min) || 0, 100);
+  const minAmt = parseFloat(account.deposit_min) || 0;
   return (
     <div
       role="button"
