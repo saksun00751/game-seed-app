@@ -417,7 +417,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
                   <img
                     src={pickedAccount.qr_pic}
                     alt="QR Code"
-                    className="w-56 h-56 object-contain"
+                    className="w-full max-w-[720px] aspect-square object-contain"
                   />
                 </div>
               )}
