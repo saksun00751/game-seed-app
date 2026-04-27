@@ -593,7 +593,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
   const CHANNEL_ORDER: ChannelKey[] = ["bank", "payment", "tw", "slip"];
   const enabledChannels: ChannelKey[] = channels
     ? CHANNEL_ORDER
-        .filter((k) => channels[k] === 1)
+        .filter((k) => channels[k] !== 0)
         .sort((a, b) => {
           const sa = channels.sort?.[a] ?? 999;
           const sb = channels.sort?.[b] ?? 999;

@@ -6,6 +6,142 @@ import PromotionPanel from "@/components/deposit/PromotionPanel";
 import { useLang } from "@/lib/i18n/context";
 import { getTranslation } from "@/lib/i18n/getTranslation";
 
+interface PaymentOption {
+  id:          string;
+  name:        string;
+  min_deposit: number;
+  payment_url: string;
+  remark:      string;
+}
+
+interface PaymentApiPayload {
+  success?: boolean;
+  message?: string;
+  bank?: Record<string, Partial<PaymentOption>>;
+}
+
+interface QrCodeData {
+  request_id:  string;
+  txid:        string;
+  status:      string;
+  amount:      number;
+  payamount:   number;
+  qrcode:      string;
+  qr_string:   string;
+  expired_date:string;
+  member: { user_name: string; name: string };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+function pickRequestId(payload: unknown): string | null {
+  const rec = asRecord(payload);
+  if (!rec) return null;
+  const root = (typeof rec.request_id === "string" ? rec.request_id.trim() : "")
+    || (typeof rec.requestId === "string" ? rec.requestId.trim() : "");
+  if (root) return root;
+  const dataRec = asRecord(rec.data);
+  const d = (typeof dataRec?.request_id === "string" ? dataRec.request_id.trim() : "")
+    || (typeof dataRec?.requestId === "string" ? dataRec.requestId.trim() : "");
+  if (d) return d;
+  const url = (typeof rec.url === "string" ? rec.url.trim() : "")
+    || (typeof dataRec?.url === "string" ? dataRec.url.trim() : "");
+  if (!url) return null;
+  try {
+    const last = new URL(url).pathname.split("/").filter(Boolean).pop() ?? "";
+    return last || null;
+  } catch {
+    const last = url.split("/").filter(Boolean).pop() ?? "";
+    return last || null;
+  }
+}
+function normalizeQrData(payload: unknown): QrCodeData | null {
+  const root = asRecord(payload);
+  const data = asRecord(root?.data);
+  if (!data) return null;
+  const request_id = typeof data.request_id === "string" ? data.request_id : "";
+  const txid = typeof data.txid === "string" ? data.txid : "";
+  const qrcode = typeof data.qrcode === "string" ? data.qrcode : "";
+  if (!request_id || !qrcode) return null;
+  const memberRec = asRecord(data.member);
+  return {
+    request_id,
+    txid,
+    status: typeof data.status === "string" ? data.status : "",
+    amount: typeof data.amount === "number" ? data.amount : Number(data.amount) || 0,
+    payamount: typeof data.payamount === "number" ? data.payamount : Number(data.payamount) || 0,
+    qrcode,
+    qr_string: typeof data.qr_string === "string" ? data.qr_string : "",
+    expired_date: typeof data.expired_date === "string" ? data.expired_date : "",
+    member: {
+      user_name: typeof memberRec?.user_name === "string" ? memberRec.user_name : "",
+      name: typeof memberRec?.name === "string" ? memberRec.name : "",
+    },
+  };
+}
+function parseExpiredDateMs(raw: string): number | null {
+  const text = raw.trim();
+  if (!text) return null;
+  const m = text.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
+  if (m) {
+    const [, y, mo, d, h, mi, s] = m;
+    return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s)).getTime();
+  }
+  const parsed = Date.parse(text);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+function formatCountdown(totalSec: number): string {
+  const sec = Math.max(0, totalSec);
+  const hh = Math.floor(sec / 3600);
+  const mm = Math.floor((sec % 3600) / 60);
+  const ss = sec % 60;
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return hh > 0 ? `${p2(hh)}:${p2(mm)}:${p2(ss)}` : `${p2(mm)}:${p2(ss)}`;
+}
+function pickErrorMessage(payload: unknown, fallback: string): string {
+  const rec = asRecord(payload);
+  if (!rec) return fallback;
+  const msg = rec.message ?? rec.msg ?? rec.error;
+  return typeof msg === "string" && msg.trim() ? msg : fallback;
+}
+function isApiSuccessFalse(payload: unknown): boolean {
+  const rec = asRecord(payload);
+  if (!rec) return false;
+  if (rec.success === false) return true;
+  const data = asRecord(rec.data);
+  return data?.success === false;
+}
+function pickDepositStatus(payload: unknown): string {
+  const rec = asRecord(payload);
+  const data = asRecord(rec?.data);
+  const candidate = data?.status ?? rec?.status ?? data?.payment_status ?? rec?.payment_status ?? data?.state ?? rec?.state ?? "";
+  return typeof candidate === "string" ? candidate.trim().toLowerCase() : String(candidate ?? "").trim().toLowerCase();
+}
+function isPaidLikeStatus(status: string): boolean {
+  const words = status.split(/[^a-z]+/).filter(Boolean);
+  return words.includes("paid") || words.includes("success") || words.includes("complete");
+}
+function isExpiredStatus(status: string): boolean {
+  const words = status.split(/[^a-z]+/).filter(Boolean);
+  return words.includes("expired") || words.includes("expire");
+}
+function normalizePayment(id: string, p: Partial<PaymentOption> | undefined): PaymentOption | null {
+  if (!p?.name) return null;
+  return {
+    id:          p.id ?? id,
+    name:        p.name,
+    min_deposit: typeof p.min_deposit === "number" ? p.min_deposit : Number(p.min_deposit) || 0,
+    payment_url: p.payment_url ?? "",
+    remark:      p.remark ?? "",
+  };
+}
+function extractPayments(payload: PaymentApiPayload): PaymentOption[] {
+  if (!payload.bank || typeof payload.bank !== "object" || Array.isArray(payload.bank)) return [];
+  return Object.entries(payload.bank).map(([k, p]) => normalizePayment(k, p)).filter(Boolean) as PaymentOption[];
+}
+
 function formatBankAccount(account: string): string {
   const digits = account.replace(/\D/g, "");
   if (digits.length === 10 || digits.length === 12) {
@@ -55,7 +191,7 @@ interface LoadBankApiPayload {
   data?: { bank?: LoadBankAccount[]; items?: LoadBankAccount[]; accounts?: LoadBankAccount[] } | LoadBankAccount[];
 }
 
-type Method = "bank" | "tw";
+type Method = "bank" | "tw" | "payment" | "slip";
 type Step = "method" | "amount" | "result";
 
 function normalizeAccount(a: Partial<LoadBankAccount> | undefined, fallbackCode: number): LoadBankAccount | null {
@@ -98,8 +234,10 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
   const { lang } = useLang();
   const t = getTranslation(lang, "deposit");
   const METHOD_META: Record<Method, { icon: string; title: string; desc: string }> = {
-    bank: { icon: "🏦", title: t.methodBankTitle, desc: t.methodBankDesc },
-    tw:   { icon: "💚", title: t.methodTwTitle,   desc: t.methodTwDesc },
+    bank:    { icon: "🏦", title: t.methodBankTitle,    desc: t.methodBankDesc },
+    tw:      { icon: "💚", title: t.methodTwTitle,      desc: t.methodTwDesc },
+    payment: { icon: "💳", title: t.methodPaymentTitle, desc: t.methodPaymentDesc },
+    slip:    { icon: "📎", title: t.methodSlipTitle,    desc: t.methodSlipDesc },
   };
   const [activePromotion, setActivePromotion] = useState<ActivePromotion | null>(
     selectedPromotion?.select ? selectedPromotion : null,
@@ -113,6 +251,15 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
   const [pickedAccount, setPickedAccount] = useState<LoadBankAccount | null>(null);
   const [error, setError]               = useState<string | null>(null);
   const [toast, setToast]               = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  const [payments, setPayments]                 = useState<PaymentOption[]>([]);
+  const [selectedPayment, setSelectedPayment]   = useState<PaymentOption | null>(null);
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [qrCodeData, setQrCodeData]             = useState<QrCodeData | null>(null);
+  const [nowTs, setNowTs]                       = useState<number>(() => Date.now());
+  const [expireDoneTxids, setExpireDoneTxids]   = useState<Record<string, boolean>>({});
+  const [statusSettledTxids, setStatusSettledTxids] = useState<Record<string, boolean>>({});
+  const [statusModal, setStatusModal]           = useState<{ kind: "success" | "expired"; message: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/deposit/channels")
@@ -128,11 +275,94 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
     setToast({ message, type });
   }
 
-  function selectMethod(m: Method) {
+  async function selectMethod(m: Method) {
     setMethod(m);
     setError(null);
     setAmount("");
+    setPayments([]);
+    setSelectedPayment(null);
+    setQrCodeData(null);
+    setExpireDoneTxids({});
+    setStatusSettledTxids({});
+    setStatusModal(null);
     setStep("amount");
+
+    if (m === "payment") {
+      setSubmitting(true);
+      try {
+        const res = await fetch("/api/deposit/loadbank", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ method: "payment" }),
+        });
+        const data: PaymentApiPayload = await res.json();
+        const list = extractPayments(data);
+        if (data.success && list.length > 0) {
+          setPayments(list);
+          setSelectedPayment(list[0]);
+        } else {
+          setError(data.message ?? t.cantLoadPayment);
+        }
+      } catch {
+        setError(t.cantConnect);
+      } finally {
+        setSubmitting(false);
+      }
+    }
+  }
+
+  async function createPaymentDeposit() {
+    if (!selectedPayment) return;
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) return;
+    if (amt < (selectedPayment.min_deposit ?? 0)) {
+      setError(t.depositMinAmount.replace("{amount}", (selectedPayment.min_deposit || 0).toLocaleString("en-US")));
+      return;
+    }
+    if (activePromotion?.select) {
+      const min = parseFloat(activePromotion.min);
+      if (Number.isFinite(min) && amt < min) {
+        setError(t.promoMin.replace("{name}", activePromotion.name).replace("{amount}", min.toLocaleString("en-US")));
+        return;
+      }
+    }
+
+    setPaymentSubmitting(true);
+    setQrCodeData(null);
+    setExpireDoneTxids({});
+    setStatusSettledTxids({});
+    setStatusModal(null);
+    setError(null);
+    try {
+      const createRes = await fetch("/api/smkpay/deposit/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amt }),
+      });
+      let createData: unknown;
+      try { createData = await createRes.json(); } catch { createData = { success: false, message: t.cantConnect }; }
+      if (!createRes.ok || isApiSuccessFalse(createData)) {
+        setError(pickErrorMessage(createData, t.cantConnect));
+        return;
+      }
+      const requestId = pickRequestId(createData);
+      if (!requestId) { setError(t.cantConnect); return; }
+      const qrRes = await fetch(`/api/smkpay/qrcode/${encodeURIComponent(requestId)}`, { method: "GET" });
+      let qrData: unknown;
+      try { qrData = await qrRes.json(); } catch { qrData = { success: false, message: t.cantConnect }; }
+      if (!qrRes.ok || isApiSuccessFalse(qrData)) {
+        setError(pickErrorMessage(qrData, t.cantConnect));
+        return;
+      }
+      const normalized = normalizeQrData(qrData);
+      if (!normalized) { setError(t.cantConnect); return; }
+      setQrCodeData(normalized);
+      setStep("result");
+    } catch {
+      setError(t.cantConnect);
+    } finally {
+      setPaymentSubmitting(false);
+    }
   }
 
   async function handleNext() {
@@ -194,11 +424,89 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
     setAmount("");
     setPickedAccount(null);
     setError(null);
+    setPayments([]);
+    setSelectedPayment(null);
+    setQrCodeData(null);
+    setExpireDoneTxids({});
+    setStatusSettledTxids({});
+    setStatusModal(null);
   }
 
+  const qrImageSrc = qrCodeData
+    ? (qrCodeData.qrcode.startsWith("data:image/")
+        ? qrCodeData.qrcode
+        : `data:image/png;base64,${qrCodeData.qrcode}`)
+    : null;
+  const expiredTs = qrCodeData ? parseExpiredDateMs(qrCodeData.expired_date) : null;
+  const countdownSec = expiredTs ? Math.max(0, Math.floor((expiredTs - nowTs) / 1000)) : null;
+
+  useEffect(() => {
+    if (!qrCodeData) return;
+    const timer = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [qrCodeData]);
+
+  useEffect(() => {
+    if (method !== "payment" || step !== "result") return;
+    if (!qrCodeData?.txid || countdownSec === null || countdownSec > 0) return;
+    if (expireDoneTxids[qrCodeData.txid]) return;
+    const txid = qrCodeData.txid;
+    setExpireDoneTxids((prev) => ({ ...prev, [txid]: true }));
+    void (async () => {
+      try {
+        await fetch(`/api/smkpay/deposit/expire/${encodeURIComponent(txid)}`, { method: "POST" });
+      } catch {}
+    })();
+  }, [method, step, qrCodeData, countdownSec, expireDoneTxids]);
+
+  useEffect(() => {
+    const txid = qrCodeData?.txid?.trim() ?? "";
+    if (method !== "payment" || step !== "result" || !txid) return;
+    if (statusModal) return;
+    if (statusSettledTxids[txid]) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleNext = () => {
+      const delayMs = 10000 + Math.floor(Math.random() * 10001);
+      timer = setTimeout(pollStatus, delayMs);
+    };
+    const pollStatus = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(`/api/smkpay/deposit/status/${encodeURIComponent(txid)}`, { method: "GET" });
+        let payload: unknown = null;
+        try { payload = await res.json(); } catch {}
+        if (!res.ok) { scheduleNext(); return; }
+        const status = pickDepositStatus(payload);
+        if (isPaidLikeStatus(status)) {
+          setStatusSettledTxids((prev) => ({ ...prev, [txid]: true }));
+          setStatusModal({ kind: "success", message: t.paidRedirect });
+          return;
+        }
+        if (isExpiredStatus(status)) {
+          setStatusSettledTxids((prev) => ({ ...prev, [txid]: true }));
+          setStatusModal({ kind: "expired", message: t.expiredRedirect });
+          return;
+        }
+      } catch {}
+      scheduleNext();
+    };
+    timer = setTimeout(pollStatus, 10000);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [method, step, qrCodeData?.txid, statusModal, statusSettledTxids, t.paidRedirect, t.expiredRedirect]);
+
+  useEffect(() => {
+    if (!statusModal) return;
+    const timer = setTimeout(() => { window.location.href = `/${lang}`; }, 2200);
+    return () => clearTimeout(timer);
+  }, [statusModal, lang]);
+
   const methods: Method[] = [];
-  if (!channels || channels.bank === 1) methods.push("bank");
-  if (!channels || channels.tw === 1) methods.push("tw");
+  if (!channels || channels.bank > 0) methods.push("bank");
+  if (!channels || channels.tw > 0) methods.push("tw");
+  if (channels && channels.payment > 0) methods.push("payment");
+  if (channels && channels.slip > 0) methods.push("slip");
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-5 pt-5 sm:pt-6">
@@ -324,7 +632,7 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
         )}
 
         {/* Step 2: Amount */}
-        {step === "amount" && method && (
+        {step === "amount" && method && method !== "payment" && (
           <div className="mt-5">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-[22px] leading-none">{METHOD_META[method].icon}</span>
@@ -367,8 +675,175 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
           </div>
         )}
 
-        {/* Step 3: Result */}
-        {step === "result" && pickedAccount && (
+        {/* Step 2: Payment */}
+        {step === "amount" && method === "payment" && (
+          <div className="mt-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[22px] leading-none">{METHOD_META.payment.icon}</span>
+              <p className="text-[15px] font-bold text-ap-primary">{METHOD_META.payment.title}</p>
+            </div>
+
+            {submitting ? (
+              <p className="text-[13px] text-ap-tertiary">{t.loading}</p>
+            ) : payments.length === 0 ? (
+              <p className="text-[13px] text-ap-red">{error ?? t.cantLoadPayment}</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-[13px] font-bold text-ap-secondary uppercase tracking-wide">{t.choosePayment}</p>
+                <div className="space-y-2">
+                  {payments.map((p) => {
+                    const active = selectedPayment?.id === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelectedPayment(p)}
+                        className={[
+                          "w-full text-left rounded-2xl border p-4 transition-all duration-200",
+                          active
+                            ? "border-blue-300 bg-blue-50/60 shadow-[0_8px_16px_rgba(37,99,235,0.10)]"
+                            : "border-slate-200 bg-white hover:border-blue-200 hover:bg-gradient-to-r hover:from-white hover:to-blue-50/40",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-[20px] flex-shrink-0">💳</div>
+                            <p className="text-[15px] font-bold text-slate-900">{p.name}</p>
+                          </div>
+                          {p.min_deposit > 0 && (
+                            <span className="text-[12px] text-slate-500">
+                              {t.minPrefix} ฿{p.min_deposit.toLocaleString("en-US")}
+                            </span>
+                          )}
+                        </div>
+                        {p.remark && (
+                          <p className="text-[13px] text-amber-600 mt-2 bg-amber-50 rounded-lg px-2 py-1">{p.remark}</p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedPayment && (
+                  <div className="pt-1 space-y-2">
+                    <label className="block text-[13px] font-bold text-ap-secondary uppercase tracking-wide">
+                      {t.amountFor} ({selectedPayment.name})
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] text-ap-tertiary pointer-events-none">฿</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={selectedPayment.min_deposit || 0}
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder={String(selectedPayment.min_deposit || 0)}
+                        className="w-full rounded-2xl border-2 border-ap-border focus:border-ap-blue outline-none pl-9 pr-4 py-3 text-[16px] font-semibold text-ap-primary bg-white transition-colors"
+                      />
+                    </div>
+                    {selectedPayment.min_deposit > 0 && (
+                      <p className="text-[12px] text-ap-tertiary">
+                        {t.depositMinAmount.replace("{amount}", selectedPayment.min_deposit.toLocaleString("en-US"))}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {error && payments.length > 0 && <p className="mt-2 text-[13px] text-ap-red">{error}</p>}
+
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={reset}
+                className="flex-1 h-12 rounded-xl border border-ap-border text-[14px] font-bold text-ap-secondary hover:bg-ap-bg transition-colors"
+              >
+                {t.back}
+              </button>
+              <button
+                type="button"
+                onClick={() => { void createPaymentDeposit(); }}
+                disabled={
+                  paymentSubmitting ||
+                  !selectedPayment ||
+                  !amount ||
+                  Number(amount) < (selectedPayment?.min_deposit ?? 0)
+                }
+                className="flex-1 h-12 rounded-xl bg-ap-blue text-white text-[14px] font-bold shadow-sm hover:bg-ap-blue-h active:scale-[0.98] transition-all disabled:opacity-60"
+              >
+                {paymentSubmitting ? t.creatingQr : t.createQr}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Result (payment QR) */}
+        {step === "result" && method === "payment" && qrCodeData && qrImageSrc && (
+          <div className="mt-5 space-y-4">
+            <div className="rounded-2xl border border-ap-blue/20 bg-ap-blue/[0.03] p-4">
+              <p className="text-[16px] font-bold text-ap-primary">{t.scanQrToPay}</p>
+              <p className="text-[13px] text-ap-secondary mt-1">{t.payWithin}</p>
+            </div>
+
+            <div className="rounded-2xl border border-ap-border bg-white p-4">
+              <div className="flex justify-center">
+                <img
+                  src={qrImageSrc}
+                  alt="Deposit QR Code"
+                  className="w-full max-w-[320px] rounded-xl border border-ap-border bg-white p-2"
+                />
+              </div>
+              <p className="mt-2 text-center text-[13px] font-semibold text-red-600">
+                {countdownSec === null
+                  ? t.expiryNotFound
+                  : countdownSec > 0
+                    ? t.expiresIn.replace("{time}", formatCountdown(countdownSec))
+                    : t.qrExpired}
+              </p>
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[13px]">
+                <div className="rounded-xl bg-ap-bg px-3 py-2">
+                  <p className="text-ap-tertiary">Amount</p>
+                  <p className="font-bold text-ap-primary">
+                    ฿{Number(qrCodeData.amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-ap-bg px-3 py-2">
+                  <p className="text-ap-tertiary">{t.expiryField}</p>
+                  <p className="font-semibold text-ap-primary">{qrCodeData.expired_date || "-"}</p>
+                </div>
+                <div className="rounded-xl bg-ap-bg px-3 py-2 sm:col-span-2">
+                  <p className="text-ap-tertiary">TXID</p>
+                  <p className="font-mono text-[12px] text-ap-primary break-all">{qrCodeData.txid || "-"}</p>
+                </div>
+                <div className="rounded-xl bg-ap-bg px-3 py-2 sm:col-span-2">
+                  <p className="text-ap-tertiary">Request ID</p>
+                  <p className="font-mono text-[12px] text-ap-primary break-all">{qrCodeData.request_id}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={reset}
+                className="flex-1 py-3 rounded-full border-2 border-ap-border text-[14px] font-semibold text-ap-secondary hover:border-ap-blue/30 transition-colors"
+              >
+                {t.chooseNewChannel}
+              </button>
+              <a
+                href={`/${lang}/transactions`}
+                className="flex-1 flex items-center justify-center py-3 rounded-2xl bg-ap-blue text-white text-[14px] font-semibold hover:bg-ap-blue-h transition-colors"
+              >
+                {t.goToFinance}
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Result (bank/tw) */}
+        {step === "result" && method !== "payment" && pickedAccount && (
           <div className="mt-5">
             <div className="rounded-2xl bg-ap-blue/5 border border-ap-blue/20 px-3 py-2 mb-3">
               <p className="text-[12px] text-ap-tertiary">{t.transferAmount}</p>
@@ -450,6 +925,24 @@ export default function DepositPageRandom({ displayName, bankName, bankLogo, ban
           </div>
         )}
       </div>
+
+      {statusModal && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center px-5">
+          <div className="w-full max-w-sm bg-white rounded-2xl border border-ap-border shadow-card p-5">
+            <p className="text-[17px] font-bold text-ap-primary">
+              {statusModal.kind === "success" ? t.depositSuccess : t.expired}
+            </p>
+            <p className="text-[14px] text-ap-secondary mt-2">{statusModal.message}</p>
+            <button
+              type="button"
+              onClick={() => { window.location.href = `/${lang}`; }}
+              className="mt-4 w-full py-3 rounded-2xl bg-ap-blue text-white text-[14px] font-semibold hover:bg-ap-blue-h transition-colors"
+            >
+              {t.goHome}
+            </button>
+          </div>
+        </div>
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>

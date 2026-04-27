@@ -262,7 +262,7 @@ function CategoryCard({
           ) : null}
           <span className="truncate">{cat.label}</span>
         </div>
-        <div className="text-white/70 mt-0.5 text-[11px] h-[30px] overflow-hidden">{cat.description || emptyDescription}</div>
+        <div className="text-white/70 mt-0.5 text-[14px] h-[36px] overflow-hidden">{cat.description || emptyDescription}</div>
       </div>
 
       <div className="mt-3 h-[24px] flex items-center gap-2">
