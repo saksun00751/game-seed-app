@@ -53,7 +53,8 @@ interface LoadBankApiPayload {
 interface PaymentApiPayload {
   success?: boolean;
   message?: string;
-  bank?: Record<string, Partial<PaymentOption>>;
+  bank?: unknown;
+  data?: { bank?: unknown; items?: unknown; accounts?: unknown } | unknown[];
 }
 
 interface PromotionItem {
@@ -104,6 +105,7 @@ const HIDE_PROMO_BUTTON_IDS = new Set([
 ]);
 
 interface QrCodeData {
+  provider_id: string;
   request_id: string;
   txid: string;
   status: string;
@@ -153,7 +155,7 @@ function pickRequestId(payload: unknown): string | null {
   }
 }
 
-function normalizeQrData(payload: unknown): QrCodeData | null {
+function normalizeQrData(payload: unknown, providerId: string): QrCodeData | null {
   const root = asRecord(payload);
   const data = asRecord(root?.data);
   if (!data) return null;
@@ -173,6 +175,7 @@ function normalizeQrData(payload: unknown): QrCodeData | null {
   const memberRec = asRecord(data.member);
 
   return {
+    provider_id: providerId,
     request_id,
     txid,
     status,
@@ -320,21 +323,41 @@ function extractSelectedPromotion(payload: unknown): ActivePromotion | null {
 
 function normalizePayment(
   id: string,
-  p: Partial<PaymentOption> | undefined,
+  p: unknown,
 ): PaymentOption | null {
-  if (!p?.name) return null;
+  const rec = asRecord(p);
+  if (!rec) return null;
+  const name = typeof rec.name === "string" ? rec.name.trim() : "";
+  if (!name) return null;
+  const rawId = rec.id;
+  const providerId =
+    typeof rawId === "string" ? rawId.trim()
+    : typeof rawId === "number" ? String(rawId)
+    : id.trim();
+  if (!providerId) return null;
+  const minDeposit = rec.min_deposit;
   return {
-    id:          p.id ?? id,
-    name:        p.name,
-    min_deposit: typeof p.min_deposit === "number" ? p.min_deposit : Number(p.min_deposit) || 0,
-    payment_url: p.payment_url ?? "",
-    remark:      p.remark ?? "",
+    id:          providerId,
+    name,
+    min_deposit: typeof minDeposit === "number" ? minDeposit : Number(minDeposit) || 0,
+    payment_url: typeof rec.payment_url === "string" ? rec.payment_url : "",
+    remark:      typeof rec.remark === "string" ? rec.remark : "",
   };
 }
 
 function extractPayments(payload: PaymentApiPayload): PaymentOption[] {
-  if (!payload.bank || typeof payload.bank !== "object" || Array.isArray(payload.bank)) return [];
-  return Object.entries(payload.bank)
+  const dataRec = asRecord(payload.data);
+  const source = payload.bank ?? dataRec?.bank ?? dataRec?.items ?? dataRec?.accounts ?? payload.data;
+  if (Array.isArray(source)) {
+    return source.map((item, i) => normalizePayment(String(i + 1), item)).filter(Boolean) as PaymentOption[];
+  }
+  const sourceRec = asRecord(source);
+  if (!sourceRec) return [];
+  if (typeof sourceRec.name === "string") {
+    const single = normalizePayment("", sourceRec);
+    return single ? [single] : [];
+  }
+  return Object.entries(sourceRec)
     .map(([k, p]) => normalizePayment(k, p))
     .filter(Boolean) as PaymentOption[];
 }
@@ -710,10 +733,13 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
     setBankError(null);
 
     try {
-      const createRes = await fetch("/api/smkpay/deposit/create", {
+      const providerPath = encodeURIComponent(selectedPayment.id.trim());
+      const createEndpoint = `/api/${providerPath}/deposit/create`;
+      const createRequest = { amount };
+      const createRes = await fetch(createEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify(createRequest),
       });
 
       let createData: unknown;
@@ -726,9 +752,35 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
           status: createRes.status,
         };
       }
-
       if (!createRes.ok || isApiSuccessFalse(createData)) {
         setBankError(pickErrorMessage(createData, t.cantConnect));
+        return;
+      }
+
+      const createRec = asRecord(createData);
+      const dataRec = asRecord(createRec?.data);
+      const target =
+        (typeof createRec?.target === "string" ? createRec.target.trim() : "")
+        || (typeof dataRec?.target === "string" ? dataRec.target.trim() : "");
+      const redirectUrl =
+        (typeof createRec?.url === "string" ? createRec.url.trim() : "")
+        || (typeof dataRec?.url === "string" ? dataRec.url.trim() : "");
+      const redirectMsg =
+        (typeof createRec?.msg === "string" ? createRec.msg.trim() : "")
+        || (typeof createRec?.message === "string" ? createRec.message.trim() : "")
+        || (typeof dataRec?.msg === "string" ? dataRec.msg.trim() : "")
+        || (typeof dataRec?.message === "string" ? dataRec.message.trim() : "");
+
+      if (target) {
+        if (redirectMsg) {
+          showFeedback(redirectMsg, "success");
+        }
+        if (redirectUrl) {
+          const windowTarget = target.startsWith("_") ? target : `_${target}`;
+          setTimeout(() => {
+            window.open(redirectUrl, windowTarget, "noopener,noreferrer");
+          }, 1500);
+        }
         return;
       }
 
@@ -738,7 +790,8 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
         return;
       }
 
-      const qrRes = await fetch(`/api/smkpay/qrcode/${encodeURIComponent(requestId)}`, {
+      const qrEndpoint = `/api/${providerPath}/qrcode/${encodeURIComponent(requestId)}`;
+      const qrRes = await fetch(qrEndpoint, {
         method: "GET",
       });
 
@@ -758,7 +811,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
         return;
       }
 
-      const normalized = normalizeQrData(qrData);
+      const normalized = normalizeQrData(qrData, selectedPayment.id);
       if (!normalized) {
         setBankError(t.cantConnect);
         return;
@@ -797,7 +850,8 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
 
     void (async () => {
       try {
-        const res = await fetch(`/api/smkpay/deposit/expire/${encodeURIComponent(txid)}`, {
+        const providerPath = encodeURIComponent(qrCodeData.provider_id);
+        const res = await fetch(`/api/${providerPath}/deposit/expire/${encodeURIComponent(txid)}`, {
           method: "POST",
         });
         if (!res.ok) {
@@ -811,7 +865,8 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
 
   useEffect(() => {
     const txid = qrCodeData?.txid?.trim() ?? "";
-    if (method !== "payment" || !showResult || !txid) return;
+    const providerId = qrCodeData?.provider_id?.trim() ?? "";
+    if (method !== "payment" || !showResult || !txid || !providerId) return;
     if (statusModal) return;
     if (statusSettledTxids[txid]) return;
 
@@ -826,7 +881,8 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
     const pollStatus = async () => {
       if (cancelled) return;
       try {
-        const res = await fetch(`/api/smkpay/deposit/status/${encodeURIComponent(txid)}`, {
+        const providerPath = encodeURIComponent(providerId);
+        const res = await fetch(`/api/${providerPath}/deposit/status/${encodeURIComponent(txid)}`, {
           method: "GET",
         });
 
@@ -859,7 +915,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [method, showResult, qrCodeData?.txid, statusModal, statusSettledTxids]);
+  }, [method, showResult, qrCodeData?.provider_id, qrCodeData?.txid, statusModal, statusSettledTxids]);
 
   useEffect(() => {
     if (!statusModal) return;
@@ -1474,6 +1530,7 @@ export default function DepositPageNormal({ displayName, bankName, bankLogo, ban
                     </div>
                   </div>
                 </div>
+
               </div>
             ) : null}
 
