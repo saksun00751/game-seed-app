@@ -1,5 +1,3 @@
-import { cache } from "react";
-
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL;
 
 export interface ContactChannel {
@@ -31,13 +29,13 @@ const MOCK_CHANNELS: ContactChannel[] = [
   { code: 1, type: "telegram", label: "@1168lotto", link: "https://1168lot.com/", sort: 21 },
 ];
 
-export const getContactChannels = cache(async (lang?: string): Promise<ContactChannel[]> => {
+export async function getContactChannels(lang?: string): Promise<ContactChannel[]> {
   try {
     const res = await fetch(`${API_BASE}/meta/contact-channels`, {
       method: "GET",
       headers: buildHeaders(lang),
       redirect: "manual",
-      next: { revalidate: 600, tags: ["contact-channels"] },
+      cache: "no-store",
     });
     if (!res.ok) return [...MOCK_CHANNELS].sort((a, b) => a.sort - b.sort);
 
@@ -51,4 +49,4 @@ export const getContactChannels = cache(async (lang?: string): Promise<ContactCh
   } catch {
     return [...MOCK_CHANNELS].sort((a, b) => a.sort - b.sort);
   }
-});
+}

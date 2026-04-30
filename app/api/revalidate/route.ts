@@ -5,7 +5,6 @@ const ALLOWED_TAGS = new Set([
   "site-meta",
   "navbar-config",
   "banks",
-  "contact-channels",
 ]);
 
 function isAuthorized(req: Request): boolean {
