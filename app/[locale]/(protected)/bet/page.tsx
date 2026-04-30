@@ -2,13 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import LotteryLayoutPage from "@/components/bet/LotteryLayoutPage";
-import LotteryCategories from "@/components/dashboard/LotteryCategories";
 import BetToastNotice from "@/components/bet/BetToastNotice";
+import PromoBanner from "@/components/ui/PromoBanner";
+import GameGroupSlider from "@/components/ui/GameGroupSlider";
 import { getBetPageData } from "@/lib/server/bet";
 import { getApiToken, getLangCookie } from "@/lib/session/cookies";
 import { apiGet } from "@/lib/api/client";
 import { mapMarketsToCategories } from "@/lib/api/lotto";
 import type { MarketsLatestResponse } from "@/lib/api/lotto";
+import { getAllGamesGroupedFromApi } from "@/lib/api/games";
 import { getTranslation } from "@/lib/i18n/getTranslation";
 import { getPageMetaTitle } from "@/lib/i18n/metaTitle";
 import type { Category } from "@/lib/categories";
@@ -250,7 +252,7 @@ function CategoryCard({
   return (
     <Link
       href={`/${locale}/category/${code}`}
-      className={`bg-gradient-to-br ${gradientClass} rounded-2xl relative overflow-hidden group active:scale-[0.98] transition-all shadow-card p-4 h-[150px] flex flex-col justify-between`}
+      className={`bg-gradient-to-br ${gradientClass} rounded-2xl relative overflow-hidden group active:scale-[0.98] transition-all shadow-card p-4 min-h-[170px] flex flex-col justify-between`}
     >
       <span className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10 pointer-events-none" />
       <span className="absolute -bottom-6 -right-2 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
@@ -262,7 +264,7 @@ function CategoryCard({
           ) : null}
           <span className="truncate">{cat.label}</span>
         </div>
-        <div className="text-white/70 mt-0.5 text-[14px] h-[36px] overflow-hidden">{cat.description || emptyDescription}</div>
+        <div className="text-white/70 mt-0.5 text-[14px] leading-snug ">{cat.description || emptyDescription}</div>
       </div>
 
       <div className="mt-3 h-[24px] flex items-center gap-2">
@@ -292,22 +294,22 @@ export default async function BetRoute({ params, searchParams }: Props) {
   const t = getTranslation(lang, "bet");
 
   let allCategories: Category[] = [];
+  let gameGroups: Awaited<ReturnType<typeof getAllGamesGroupedFromApi>> = [];
   const drawIdFromQuery = sp?.draw_id ? Number(sp.draw_id) : undefined;
   let drawDetail: DrawDetailResponse["data"] | null = null;
-
   try {
     const drawReq = Number.isFinite(drawIdFromQuery)
       ? apiGet<DrawDetailResponse>(`/lotto/draws/${drawIdFromQuery}`, token, lang)
       : Promise.resolve(null);
-    const [marketsRes, drawRes] = await Promise.all([
+    const [marketsRes, groups, drawRes] = await Promise.all([
       apiGet<MarketsLatestResponse>("/lotto/markets/latest", token, lang),
+      getAllGamesGroupedFromApi(token, lang),
       drawReq,
     ]);
     if (marketsRes?.data?.groups) allCategories = mapMarketsToCategories(marketsRes.data.groups);
+    gameGroups = groups;
     drawDetail = drawRes?.data ?? null;
-  } catch (error) {
-    console.error("Bet page error:", error);
-  }
+  } catch {}
 
   const lotteryFromDrawApi =
     drawDetail?.market?.id !== undefined && drawDetail?.market?.id !== null
@@ -402,7 +404,7 @@ export default async function BetRoute({ params, searchParams }: Props) {
   }
 
   // ไม่มี lottery param → แสดงหน้าเลือกหมวดหมู่
-  const categories = allCategories;
+  const lottoCategories = allCategories;
 
   return (
     <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">
@@ -411,14 +413,19 @@ export default async function BetRoute({ params, searchParams }: Props) {
       </Suspense>
       <div className="max-w-5xl mx-auto px-5 pt-6 space-y-8">
 
-        {/* หมวดหมู่หวย */}
-        {categories.length > 0 && (
+        <PromoBanner  />
+
+        {/* หวย */}
+        {lottoCategories.length > 0 && (
           <section className="bg-white rounded-2xl border border-ap-border shadow-card overflow-hidden">
             <div className="bg-gradient-to-r from-ap-blue to-sky-400 px-4 py-3 flex items-center justify-between">
               <h2 className="text-[15px] font-bold text-white tracking-tight">{t.lotto}</h2>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4">
-              {categories.map((cat, idx) => (
+             
+
+              {lottoCategories.map((cat, idx) => (
+                
                 <CategoryCard
                   key={cat.id}
                   cat={cat}
@@ -433,8 +440,33 @@ export default async function BetRoute({ params, searchParams }: Props) {
           </section>
         )}
 
-        {/* หวยวันนี้ */}
-        <LotteryCategories />
+        {/* เกมส์ */}
+        {gameGroups.map((group) => {
+          const headerGradient: Record<string, string> = {
+            SLOT:      "from-rose-500 to-pink-400",
+            CASINO:    "from-amber-500 to-yellow-400",
+            SPORT:     "from-green-600 to-lime-400",
+            CARDGROUP: "from-violet-600 to-purple-400",
+            COCK:      "from-orange-600 to-red-400",
+            FISH:      "from-cyan-500 to-teal-400",
+          };
+          const gradient = headerGradient[group.game_type] ?? "from-gray-500 to-gray-400";
+          return (
+            <section key={group.game_type} className="bg-white rounded-2xl border border-ap-border shadow-card overflow-hidden">
+              <div className={`bg-gradient-to-r ${gradient} flex items-center justify-between px-4 py-3`}>
+                <h2 className="text-[15px] font-bold text-white tracking-tight">
+                  {group.emoji} {(t as Record<string, string>)[group.game_type] ?? group.label}
+                </h2>
+                <Link href={`/${locale}/games/${group.game_type.toLowerCase()}`} className="text-[14px] font-semibold text-white/80 hover:text-white">
+                  {t.viewAll} ({group.providers.length}) →
+                </Link>
+              </div>
+              <div className="px-4 py-3">
+                <GameGroupSlider games={group.providers} gameType={group.game_type.toLowerCase()} />
+              </div>
+            </section>
+          );
+        })}
 
       </div>
     </div>
